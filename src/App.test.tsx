@@ -1,41 +1,151 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { App } from './App';
+import {
+  apiError,
+  deferred,
+  healthOk,
+  json,
+  mockApi,
+  operatorSession,
+  renderApp,
+  summaryFor,
+} from './test/mockApi';
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('App shell', () => {
-  it('shows the API as online when the health check succeeds', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({ status: 'ok', service: 'mab-pms-api', time: new Date().toISOString() }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        },
-      ),
-    );
-    vi.stubGlobal('fetch', fetchMock);
-    render(<App />);
+const unauthenticated = () => apiError(401, 'UNAUTHENTICATED', 'Sign in required');
+
+describe('routing and route protection', () => {
+  it('sends signed-out users to the sign-in page', async () => {
+    mockApi({ 'GET /api/auth/session': unauthenticated(), 'GET /api/health': healthOk });
+    renderApp('/');
+    expect(await screen.findByRole('heading', { name: /Sign in/ })).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /MAB Production Management System/ }),
+      screen.getByRole('heading', { name: 'MAB Production Management System' }),
     ).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('api-status')).toHaveTextContent('Online'));
-    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:4000/api/health', expect.any(Object));
   });
 
-  it('shows the API as unavailable when the health check fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network down')));
-    render(<App />);
-    await waitFor(() => expect(screen.getByTestId('api-status')).toHaveTextContent('Unavailable'));
+  it('shows a loading state while the session is checked', async () => {
+    const session = deferred();
+    mockApi({
+      'GET /api/auth/session': () => session.promise,
+      'GET /api/health': healthOk,
+    });
+    renderApp('/');
+    expect(screen.getByRole('status')).toHaveTextContent('Checking your session');
+    session.resolve(unauthenticated());
+    expect(await screen.findByRole('heading', { name: /Sign in/ })).toBeInTheDocument();
   });
 
-  it('treats a malformed health response as unavailable', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({ hello: 'world' }), { status: 200 })),
+  it('explains an expired session on the sign-in page', async () => {
+    mockApi({
+      'GET /api/auth/session': apiError(401, 'SESSION_EXPIRED', 'Your session has expired.'),
+      'GET /api/health': healthOk,
+    });
+    renderApp('/');
+    expect(await screen.findByText(/Your session has expired/)).toBeInTheDocument();
+  });
+
+  it('shows a not-found page for unknown routes inside the app', async () => {
+    mockApi({
+      'GET /api/auth/session': json(200, operatorSession),
+      'GET /api/dashboard/summary': json(200, summaryFor(operatorSession)),
+    });
+    renderApp('/no-such-page');
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+  });
+});
+
+describe('layout and navigation', () => {
+  function signedIn(path = '/') {
+    const api = mockApi({
+      'GET /api/auth/session': json(200, operatorSession),
+      'GET /api/dashboard/summary': json(200, summaryFor(operatorSession)),
+      'POST /api/auth/logout': new Response(null, { status: 204 }),
+      'GET /api/health': healthOk,
+    });
+    renderApp(path);
+    return api;
+  }
+
+  it('opens and closes the mobile menu with the button, Escape and the overlay', async () => {
+    const user = userEvent.setup();
+    signedIn();
+    const open = await screen.findByRole('button', { name: 'Open menu' });
+    expect(open).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(open);
+    expect(screen.getByRole('dialog', { name: 'Navigation menu' })).toBeInTheDocument();
+    expect(open).toHaveAttribute('aria-expanded', 'true');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(open).toHaveFocus();
+
+    await user.click(open);
+    await user.click(screen.getByTestId('menu-overlay'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(open);
+    await user.click(screen.getByRole('button', { name: 'Close menu' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('closes the mobile menu after navigating and opens an honest placeholder for planned modules', async () => {
+    const user = userEvent.setup();
+    signedIn();
+    await user.click(await screen.findByRole('button', { name: 'Open menu' }));
+    const drawer = screen.getByRole('dialog', { name: 'Navigation menu' });
+    await user.click(within(drawer).getByRole('link', { name: /Demands/ }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Demands' })).toBeInTheDocument();
+    expect(screen.getByText('Not available yet')).toBeInTheDocument();
+    expect(screen.getByText(/planned for milestone/)).toHaveTextContent('M5');
+    // A placeholder offers no form or action buttons that pretend to work.
+    expect(screen.queryByRole('form')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('marks the active page in the sidebar', async () => {
+    signedIn('/modules/stock');
+    const nav = (await screen.findAllByRole('navigation', { name: 'Main navigation' }))[0];
+    if (!nav) throw new Error('navigation missing');
+    expect(within(nav).getByRole('link', { name: /Receiving & stock/ })).toHaveAttribute(
+      'aria-current',
+      'page',
     );
-    render(<App />);
-    await waitFor(() => expect(screen.getByTestId('api-status')).toHaveTextContent('Unavailable'));
+    expect(within(nav).getByRole('link', { name: /Dashboard/ })).not.toHaveAttribute(
+      'aria-current',
+    );
+  });
+
+  it('signs out with the CSRF token and returns to the sign-in page', async () => {
+    const user = userEvent.setup();
+    const { calls } = signedIn();
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }));
+
+    expect(await screen.findByRole('heading', { name: /Sign in/ })).toBeInTheDocument();
+    expect(screen.getByText('You have signed out.')).toBeInTheDocument();
+    const logoutCall = calls.find((c) => c.method === 'POST' && c.path === '/api/auth/logout');
+    expect(logoutCall).toBeDefined();
+    const headers = logoutCall?.init?.headers as Record<string, string>;
+    expect(headers['X-CSRF-Token']).toBe(operatorSession.csrfToken);
+    expect(logoutCall?.init?.credentials).toBe('include');
+  });
+
+  it('still signs out locally if the server cannot be reached', async () => {
+    const user = userEvent.setup();
+    mockApi({
+      'GET /api/auth/session': json(200, operatorSession),
+      'GET /api/dashboard/summary': json(200, summaryFor(operatorSession)),
+      'POST /api/auth/logout': () => Promise.reject(new TypeError('network down')),
+      'GET /api/health': healthOk,
+    });
+    renderApp('/');
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }));
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: /Sign in/ })).toBeInTheDocument(),
+    );
   });
 });
