@@ -3,7 +3,7 @@
 React + TypeScript + Vite + Tailwind CSS web app for the MAB Production Management System.
 Separate repository from the backend (`../backend`). Deployment target: Vercel (this folder is the project root).
 
-**Status:** M4 — sign-in, session handling, responsive layout, dashboard and the Master Data section (`/master-data/:entity`). Later modules are listed in the navigation as clearly labelled "Not available yet" pages until their milestones (M5–M11).
+**Status:** M5 — sign-in, session handling, responsive layout, dashboard, the Master Data section (`/master-data/:entity`) and the Demands section (`/demands`). Later modules are listed in the navigation as clearly labelled "Not available yet" pages until their milestones (M6–M11).
 
 ## Structure
 

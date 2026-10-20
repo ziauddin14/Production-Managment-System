@@ -5,6 +5,9 @@ import { AppLayout } from './components/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { MasterDataPage } from './pages/masterData/MasterDataPage';
+import { DemandDetailPage } from './pages/demands/DemandDetailPage';
+import { DemandFormPage } from './pages/demands/DemandFormPage';
+import { DemandsListPage } from './pages/demands/DemandsListPage';
 import { ModulePlaceholderPage } from './pages/ModulePlaceholderPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -24,6 +27,10 @@ export function App() {
           <Route index element={<DashboardPage />} />
           <Route path="master-data" element={<MasterDataPage />} />
           <Route path="master-data/:entity" element={<MasterDataPage />} />
+          <Route path="demands" element={<DemandsListPage />} />
+          <Route path="demands/new" element={<DemandFormPage />} />
+          <Route path="demands/:id" element={<DemandDetailPage />} />
+          <Route path="demands/:id/edit" element={<DemandFormPage />} />
           <Route path="modules/:moduleKey" element={<ModulePlaceholderPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

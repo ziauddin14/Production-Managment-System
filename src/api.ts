@@ -14,6 +14,14 @@ import {
   type MasterListResponse,
   type MasterRecord,
 } from './contracts/masterData';
+import {
+  demandDetailSchema,
+  demandListResponseSchema,
+  type DemandDetail,
+  type DemandListParams,
+  type DemandListResponse,
+  type DemandPayload,
+} from './contracts/demands';
 import { apiBaseUrl } from './config';
 
 /** An error returned by the PMS API, with its machine-readable code and safe message. */
@@ -160,6 +168,65 @@ export function updateMasterRecord(
 ): Promise<MasterRecord> {
   return apiRequest(`/api/master/${entity}/${id}`, masterRecordSchema, {
     method: 'PATCH',
+    body,
+    csrfToken,
+  });
+}
+
+/** Loads every record of a master list (pages of 100), for selection lists in forms. */
+export async function listAllMasterRecords(
+  entity: MasterEntityKey,
+  status: 'active' | 'all' = 'active',
+  signal?: AbortSignal,
+): Promise<MasterRecord[]> {
+  const all: MasterRecord[] = [];
+  for (let page = 1; page <= 50; page += 1) {
+    const result = await listMasterRecords(entity, { status, page, pageSize: 100 }, signal);
+    all.push(...result.items);
+    if (all.length >= result.total || result.items.length === 0) break;
+  }
+  return all;
+}
+
+export function listDemands(
+  params: DemandListParams,
+  signal?: AbortSignal,
+): Promise<DemandListResponse> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') query.set(key, String(value));
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return apiRequest(`/api/demands${suffix}`, demandListResponseSchema, { signal });
+}
+
+export function getDemand(id: string, signal?: AbortSignal): Promise<DemandDetail> {
+  return apiRequest(`/api/demands/${id}`, demandDetailSchema, { signal });
+}
+
+export function createDemand(body: DemandPayload, csrfToken: string): Promise<DemandDetail> {
+  return apiRequest('/api/demands', demandDetailSchema, { method: 'POST', body, csrfToken });
+}
+
+export function updateDemand(
+  id: string,
+  body: Partial<DemandPayload> & { rev: number },
+  csrfToken: string,
+): Promise<DemandDetail> {
+  return apiRequest(`/api/demands/${id}`, demandDetailSchema, {
+    method: 'PATCH',
+    body,
+    csrfToken,
+  });
+}
+
+export function cancelDemand(
+  id: string,
+  body: { rev: number; reason: string },
+  csrfToken: string,
+): Promise<DemandDetail> {
+  return apiRequest(`/api/demands/${id}/cancel`, demandDetailSchema, {
+    method: 'POST',
     body,
     csrfToken,
   });

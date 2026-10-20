@@ -96,12 +96,12 @@ describe('layout and navigation', () => {
     signedIn();
     await user.click(await screen.findByRole('button', { name: 'Open menu' }));
     const drawer = screen.getByRole('dialog', { name: 'Navigation menu' });
-    await user.click(within(drawer).getByRole('link', { name: /Demands/ }));
+    await user.click(within(drawer).getByRole('link', { name: /Purchase orders/ }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'Demands' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Purchase orders' })).toBeInTheDocument();
     expect(screen.getByText('Not available yet')).toBeInTheDocument();
-    expect(screen.getByText(/planned for milestone/)).toHaveTextContent('M5');
+    expect(screen.getByText(/planned for milestone/)).toHaveTextContent('M6');
     // A placeholder offers no form or action buttons that pretend to work.
     expect(screen.queryByRole('form')).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();

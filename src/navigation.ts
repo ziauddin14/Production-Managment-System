@@ -37,18 +37,17 @@ export const ACTIVE_MODULES: NavItem[] = [
     icon: Database,
     description: 'Provinces, divisions, departments, items, vendors and warehouses.',
   },
+  {
+    key: 'demands',
+    label: 'Demands',
+    path: '/demands',
+    icon: ClipboardList,
+    description: 'Register demands with multiple items and track partial fulfilment.',
+  },
 ];
 
 /** Future modules, in roadmap order. They open an explanatory page, not a working screen. */
 export const PLANNED_MODULES: NavItem[] = [
-  {
-    key: 'demands',
-    label: 'Demands',
-    path: '/modules/demands',
-    icon: ClipboardList,
-    plannedMilestone: 'M5',
-    description: 'Register demands with multiple items and track partial fulfilment.',
-  },
   {
     key: 'purchase-orders',
     label: 'Purchase orders',
