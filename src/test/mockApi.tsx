@@ -12,8 +12,13 @@ export function json(status: number, body: unknown): Response {
   });
 }
 
-export function apiError(status: number, code: string, message: string): Response {
-  return json(status, { error: { code, message } });
+export function apiError(
+  status: number,
+  code: string,
+  message: string,
+  details: Array<{ path: string; message: string }> = [],
+): Response {
+  return json(status, { error: { code, message, details } });
 }
 
 /**

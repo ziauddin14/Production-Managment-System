@@ -44,18 +44,17 @@ export const ACTIVE_MODULES: NavItem[] = [
     icon: ClipboardList,
     description: 'Register demands with multiple items and track partial fulfilment.',
   },
+  {
+    key: 'purchase-orders',
+    label: 'Purchase orders',
+    path: '/purchase-orders',
+    icon: Package,
+    description: 'Purchase orders, approved amounts, payment schedules and vendors.',
+  },
 ];
 
 /** Future modules, in roadmap order. They open an explanatory page, not a working screen. */
 export const PLANNED_MODULES: NavItem[] = [
-  {
-    key: 'purchase-orders',
-    label: 'Purchase orders',
-    path: '/modules/purchase-orders',
-    icon: Package,
-    plannedMilestone: 'M6',
-    description: 'Purchase orders, approved amounts, payment schedules and vendors.',
-  },
   {
     key: 'stock',
     label: 'Receiving & stock',

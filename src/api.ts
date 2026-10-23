@@ -188,6 +188,15 @@ export async function listAllMasterRecords(
   return all;
 }
 
+import {
+  purchaseOrderDetailSchema,
+  purchaseOrderListResponseSchema,
+  type PurchaseOrderDetail,
+  type PurchaseOrderListParams,
+  type PurchaseOrderListResponse,
+  type PurchaseOrderPayload,
+} from './contracts/purchaseOrders';
+
 export function listDemands(
   params: DemandListParams,
   signal?: AbortSignal,
@@ -226,6 +235,57 @@ export function cancelDemand(
   csrfToken: string,
 ): Promise<DemandDetail> {
   return apiRequest(`/api/demands/${id}/cancel`, demandDetailSchema, {
+    method: 'POST',
+    body,
+    csrfToken,
+  });
+}
+
+export function listPurchaseOrders(
+  params: PurchaseOrderListParams,
+  signal?: AbortSignal,
+): Promise<PurchaseOrderListResponse> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') query.set(key, String(value));
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return apiRequest(`/api/purchase-orders${suffix}`, purchaseOrderListResponseSchema, { signal });
+}
+
+export function getPurchaseOrder(id: string, signal?: AbortSignal): Promise<PurchaseOrderDetail> {
+  return apiRequest(`/api/purchase-orders/${id}`, purchaseOrderDetailSchema, { signal });
+}
+
+export function createPurchaseOrder(
+  body: PurchaseOrderPayload,
+  csrfToken: string,
+): Promise<PurchaseOrderDetail> {
+  return apiRequest('/api/purchase-orders', purchaseOrderDetailSchema, {
+    method: 'POST',
+    body,
+    csrfToken,
+  });
+}
+
+export function updatePurchaseOrder(
+  id: string,
+  body: Partial<PurchaseOrderPayload> & { rev: number },
+  csrfToken: string,
+): Promise<PurchaseOrderDetail> {
+  return apiRequest(`/api/purchase-orders/${id}`, purchaseOrderDetailSchema, {
+    method: 'PATCH',
+    body,
+    csrfToken,
+  });
+}
+
+export function cancelPurchaseOrder(
+  id: string,
+  body: { rev: number; reason: string },
+  csrfToken: string,
+): Promise<PurchaseOrderDetail> {
+  return apiRequest(`/api/purchase-orders/${id}/cancel`, purchaseOrderDetailSchema, {
     method: 'POST',
     body,
     csrfToken,
