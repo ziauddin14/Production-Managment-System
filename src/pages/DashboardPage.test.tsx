@@ -108,4 +108,53 @@ describe('DashboardPage', () => {
     renderApp('/');
     expect(await screen.findByRole('alert')).toHaveTextContent('unexpected response');
   });
+
+  it('shows stock, dispatch and outstanding-payment indicators, with money as PKR', async () => {
+    const base = summaryFor(operatorSession);
+    mockApi({
+      'GET /api/auth/session': json(200, operatorSession),
+      'GET /api/dashboard/summary': json(200, {
+        ...base,
+        indicators: [
+          ...base.indicators,
+          {
+            key: 'stockLots',
+            label: 'Stock on hand',
+            description: 'Units held in warehouses, by PO/item lot',
+            status: 'available',
+            value: 1200,
+            plannedMilestone: null,
+          },
+          {
+            key: 'dispatchesThisMonth',
+            label: 'Dispatches this month',
+            description: 'Bilty dispatches recorded this calendar month',
+            status: 'available',
+            value: 7,
+            plannedMilestone: null,
+          },
+          {
+            key: 'outstandingVendorPayments',
+            label: 'Outstanding vendor payments',
+            description: 'Approved PO amounts not yet paid',
+            status: 'available',
+            value: 125000.5,
+            plannedMilestone: null,
+          },
+        ],
+      }),
+    });
+    renderApp('/');
+    expect(
+      within(await screen.findByRole('article', { name: 'Stock on hand' })).getByText('1,200'),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('article', { name: 'Dispatches this month' })).getByText('7'),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('article', { name: 'Outstanding vendor payments' })).getByText(
+        'PKR 125,000.50',
+      ),
+    ).toBeInTheDocument();
+  });
 });

@@ -10,6 +10,7 @@ import {
   viewerSession,
 } from '../../test/mockApi';
 import { poDetail, poMasterRoutes, PO_ID } from '../../test/purchaseOrderFixtures';
+import { page, payment, receiptSummary } from '../../test/operationsFixtures';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -57,6 +58,78 @@ describe('Purchase order detail', () => {
     expect(await screen.findByRole('heading', { name: 'DIT/0001' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cancel PO' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Record receipt' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Record payment' })).not.toBeInTheDocument();
+  });
+
+  it('shows received quantities, payment balance, receipts, payments and record actions', async () => {
+    const line = poDetail().lines[0]!;
+    const po = poDetail({
+      completion: 'PARTIAL',
+      totalReceived: 200,
+      paidAmount: 20000,
+      outstandingAmount: 30000,
+      paymentStatus: 'PARTIAL',
+      lines: [{ ...line, quantityReceived: 200, quantityRemaining: 300, completion: 'PARTIAL' }],
+    });
+    const { calls } = mockApi({
+      ...session(),
+      [`GET /api/purchase-orders/${PO_ID}`]: json(200, po),
+      'GET /api/receipts': page([receiptSummary(1)]),
+      'GET /api/payments': page([payment(1)]),
+    });
+    renderApp(`/purchase-orders/${PO_ID}`);
+
+    expect(await screen.findByRole('heading', { name: 'DIT/0001' })).toBeInTheDocument();
+    expect(screen.getByText('Partially paid')).toBeInTheDocument();
+    expect(screen.getByText('PKR 30,000.00')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Record receipt' })).toHaveAttribute(
+      'href',
+      `/receiving/new?purchaseOrderId=${PO_ID}`,
+    );
+    expect(screen.getByRole('link', { name: 'Record payment' })).toHaveAttribute(
+      'href',
+      `/payments/new?purchaseOrderId=${PO_ID}`,
+    );
+
+    const receipts = screen.getByRole('region', { name: 'Receipts' });
+    expect(await within(receipts).findByRole('link', { name: 'GRN-000001' })).toBeInTheDocument();
+    const payments = screen.getByRole('region', { name: 'Payments' });
+    expect(await within(payments).findByRole('link', { name: 'PAY-000001' })).toBeInTheDocument();
+    expect(within(payments).getByText('PKR 20,000.00')).toBeInTheDocument();
+    expect(calls.find((c) => c.path === '/api/receipts')?.search.get('purchaseOrderId')).toBe(
+      PO_ID,
+    );
+    expect(calls.find((c) => c.path === '/api/payments')?.search.get('purchaseOrderId')).toBe(
+      PO_ID,
+    );
+  });
+
+  it('offers no receipt or payment action once the PO is fully received and paid', async () => {
+    const line = poDetail().lines[0]!;
+    mockApi({
+      ...session(),
+      [`GET /api/purchase-orders/${PO_ID}`]: json(
+        200,
+        poDetail({
+          completion: 'COMPLETE',
+          totalReceived: 500,
+          paidAmount: 50000,
+          outstandingAmount: 0,
+          paymentStatus: 'PAID',
+          lines: [{ ...line, quantityReceived: 500, quantityRemaining: 0, completion: 'COMPLETE' }],
+        }),
+      ),
+      'GET /api/receipts': page([]),
+      'GET /api/payments': page([]),
+    });
+    renderApp(`/purchase-orders/${PO_ID}`);
+    expect(await screen.findByRole('heading', { name: 'DIT/0001' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Record receipt' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Record payment' })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText('No goods have been received against this purchase order yet.'),
+    ).toBeInTheDocument();
   });
 
   it('cancels with a required reason, rev and CSRF token', async () => {

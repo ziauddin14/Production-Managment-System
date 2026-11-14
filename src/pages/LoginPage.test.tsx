@@ -105,11 +105,11 @@ describe('LoginPage', () => {
   it('returns to the page the user originally requested', async () => {
     const user = userEvent.setup();
     signedOutApi(json(200, operatorSession));
-    renderApp('/modules/finance');
+    renderApp('/payments');
     await user.type(await screen.findByLabelText('Username'), 'synthetic.operator');
     await user.type(screen.getByLabelText('Password'), SYNTHETIC_PASSWORD);
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(await screen.findByRole('heading', { name: 'Payments & finance' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Vendor payments' })).toBeInTheDocument();
   });
 
   it('can show and hide the password', async () => {

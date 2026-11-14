@@ -1,1 +1,19 @@
 @import 'tailwindcss';
+
+/* Printing (delivery challan, reports): only the page content is printed, never the app chrome. */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  body {
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .challan table {
+    page-break-inside: auto;
+  }
+  .challan tr {
+    page-break-inside: avoid;
+  }
+}

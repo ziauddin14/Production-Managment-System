@@ -91,27 +91,49 @@ describe('layout and navigation', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('closes the mobile menu after navigating and opens an honest placeholder for planned modules', async () => {
+  it('closes the mobile menu after navigating to a module', async () => {
     const user = userEvent.setup();
     signedIn();
     await user.click(await screen.findByRole('button', { name: 'Open menu' }));
     const drawer = screen.getByRole('dialog', { name: 'Navigation menu' });
-    await user.click(within(drawer).getByRole('link', { name: /Receiving & stock/ }));
+    await user.click(within(drawer).getByRole('link', { name: 'Receiving' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'Receiving & stock' })).toBeInTheDocument();
-    expect(screen.getByText('Not available yet')).toBeInTheDocument();
-    expect(screen.getByText(/planned for milestone/)).toHaveTextContent('M7');
-    // A placeholder offers no form or action buttons that pretend to work.
-    expect(screen.queryByRole('form')).not.toBeInTheDocument();
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Receiving' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'New receipt' })).toHaveAttribute(
+      'href',
+      '/receiving/new',
+    );
+  });
+
+  it('lists every M7–M11 module as a working page and no planned-module placeholders', async () => {
+    signedIn();
+    const nav = (await screen.findAllByRole('navigation', { name: 'Main navigation' }))[0];
+    if (!nav) throw new Error('navigation missing');
+    const expected: Array<[string, string]> = [
+      ['Receiving', '/receiving'],
+      ['Stock & ledger', '/stock'],
+      ['Dispatch & Bilty', '/dispatches'],
+      ['Vendor payments', '/payments'],
+      ['Excel sync', '/sync'],
+      ['Reports', '/reports'],
+    ];
+    for (const [label, href] of expected) {
+      expect(within(nav).getByRole('link', { name: label })).toHaveAttribute('href', href);
+    }
+    expect(within(nav).queryByText('Planned modules')).not.toBeInTheDocument();
+  });
+
+  it('redirects old planned-module links to the working module', async () => {
+    signedIn('/modules/dispatch');
+    expect(await screen.findByRole('heading', { name: 'Dispatch & Bilty' })).toBeInTheDocument();
   });
 
   it('marks the active page in the sidebar', async () => {
-    signedIn('/modules/stock');
+    signedIn('/stock');
     const nav = (await screen.findAllByRole('navigation', { name: 'Main navigation' }))[0];
     if (!nav) throw new Error('navigation missing');
-    expect(within(nav).getByRole('link', { name: /Receiving & stock/ })).toHaveAttribute(
+    expect(within(nav).getByRole('link', { name: 'Stock & ledger' })).toHaveAttribute(
       'aria-current',
       'page',
     );

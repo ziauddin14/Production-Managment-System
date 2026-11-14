@@ -6,6 +6,7 @@ import {
   FileSpreadsheet,
   LayoutDashboard,
   Package,
+  PackageCheck,
   Truck,
   Wallet,
   type LucideIcon,
@@ -51,48 +52,52 @@ export const ACTIVE_MODULES: NavItem[] = [
     icon: Package,
     description: 'Purchase orders, approved amounts, payment schedules and vendors.',
   },
-];
-
-/** Future modules, in roadmap order. They open an explanatory page, not a working screen. */
-export const PLANNED_MODULES: NavItem[] = [
+  {
+    key: 'receiving',
+    label: 'Receiving',
+    path: '/receiving',
+    icon: PackageCheck,
+    description: 'Goods received from vendors against purchase orders.',
+  },
   {
     key: 'stock',
-    label: 'Receiving & stock',
-    path: '/modules/stock',
+    label: 'Stock & ledger',
+    path: '/stock',
     icon: Boxes,
-    plannedMilestone: 'M7',
-    description: 'Vendor receipts and warehouse stock by PO/item lot.',
+    description: 'Stock balances by location and PO/item lot, and the inventory ledger.',
   },
   {
     key: 'dispatch',
     label: 'Dispatch & Bilty',
-    path: '/modules/dispatch',
+    path: '/dispatches',
     icon: Truck,
-    plannedMilestone: 'M8',
-    description: 'Dispatches, Bilty records and supporting documents.',
+    description: 'Dispatches to divisions, Bilty records, documents and delivery challans.',
   },
   {
     key: 'finance',
-    label: 'Payments & finance',
-    path: '/modules/finance',
+    label: 'Vendor payments',
+    path: '/payments',
     icon: Wallet,
-    plannedMilestone: 'M9',
-    description: 'Vendor instalments, division receipts and 3% recovery records.',
+    description: 'Payments to vendors against purchase orders and their schedules.',
   },
   {
     key: 'excel-sync',
     label: 'Excel sync',
-    path: '/modules/excel-sync',
+    path: '/sync',
     icon: FileSpreadsheet,
-    plannedMilestone: 'M10',
-    description: 'Two-way synchronisation with the existing workbooks.',
+    description: 'Status of the queue that keeps the Excel workbooks in step with PMS.',
   },
   {
     key: 'reports',
     label: 'Reports',
-    path: '/modules/reports',
+    path: '/reports',
     icon: BarChart3,
-    plannedMilestone: 'M11',
-    description: 'Province, division, vendor, item, monthly and yearly reports.',
+    description: 'Purchase order, receipt, stock, dispatch, payment, demand and vendor reports.',
   },
 ];
+
+/**
+ * Future modules, in roadmap order. They open an explanatory page, not a working screen.
+ * Every module of the current roadmap (M4–M11) is built, so the list is empty.
+ */
+export const PLANNED_MODULES: NavItem[] = [];

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
-import { Ban, Loader2, Pencil, X } from 'lucide-react';
+import { Ban, Loader2, Pencil, Truck, X } from 'lucide-react';
 import { ApiError, cancelDemand, getDemand } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 import {
@@ -15,6 +15,7 @@ import {
   StatusBadge,
 } from '../../components/ui';
 import { FULFILMENT_LABELS, type DemandDetail, type MasterRef } from '../../contracts/demands';
+import { DemandDispatches } from './DemandDispatches';
 
 type Result =
   | { key: string; kind: 'ready'; demand: DemandDetail }
@@ -102,7 +103,13 @@ export function DemandDetailPage() {
               )}
             </div>
             {canWrite && demand.status === 'OPEN' && (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                {demand.lines.some((l) => l.quantityRemaining > 0) && (
+                  <Link to={`/dispatches/new?demandId=${demand.id}`} className={primaryButton}>
+                    <Truck className="h-4 w-4" aria-hidden="true" />
+                    Dispatch
+                  </Link>
+                )}
                 <Link to={`/demands/${demand.id}/edit`} className={secondaryButton}>
                   <Pencil className="h-4 w-4" aria-hidden="true" />
                   Edit
@@ -165,7 +172,7 @@ export function DemandDetailPage() {
                 Items ({demand.lineCount})
               </h2>
               <p className="mt-0.5 text-sm text-slate-500">
-                Delivered quantities come from dispatch records, which are added in milestone M8.
+                Delivered quantities are the sum of active dispatches linked to each line.
               </p>
             </div>
             <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -243,6 +250,8 @@ export function DemandDetailPage() {
               </p>
             )}
           </section>
+
+          <DemandDispatches demandId={demand.id} />
 
           {cancelOpen && session && (
             <CancelDialog
