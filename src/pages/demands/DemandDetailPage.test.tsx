@@ -11,6 +11,7 @@ import {
   viewerSession,
 } from '../../test/mockApi';
 import { DEMAND_ID, demandDetail } from '../../test/demandFixtures';
+import { dispatchSummary, page } from '../../test/operationsFixtures';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -157,5 +158,43 @@ describe('Demand detail', () => {
 
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows delivered quantities, its dispatches and a Dispatch action for the operator', async () => {
+    const line = demandDetail().lines[0]!;
+    const { calls } = mockApi({
+      ...session(),
+      [`GET /api${path}`]: json(
+        200,
+        demandDetail({
+          fulfilment: 'PARTIAL',
+          lines: [{ ...line, quantityDelivered: 5, quantityRemaining: 5, fulfilment: 'PARTIAL' }],
+        }),
+      ),
+      'GET /api/dispatches': page([dispatchSummary(1)]),
+    });
+    renderApp(path);
+    expect(await screen.findByRole('heading', { name: 'DMD-000001' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Dispatch' })).toHaveAttribute(
+      'href',
+      `/dispatches/new?demandId=${DEMAND_ID}`,
+    );
+    const dispatches = screen.getByRole('region', { name: 'Dispatches' });
+    expect(await within(dispatches).findByRole('link', { name: 'DSP-000001' })).toBeInTheDocument();
+    expect(calls.find((c) => c.path === '/api/dispatches')?.search.get('demandId')).toBe(DEMAND_ID);
+  });
+
+  it('hides the Dispatch action from viewers', async () => {
+    mockApi({
+      ...session(viewerSession),
+      [`GET /api${path}`]: json(200, demandDetail()),
+      'GET /api/dispatches': page([]),
+    });
+    renderApp(path);
+    expect(await screen.findByRole('heading', { name: 'DMD-000001' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Dispatch' })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText('Nothing has been dispatched against this demand yet.'),
+    ).toBeInTheDocument();
   });
 });

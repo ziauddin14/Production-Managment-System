@@ -4,6 +4,7 @@ import { ApiError, getDashboardSummary } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { ROLE_LABELS } from '../contracts/auth';
 import type { DashboardIndicator, DashboardSummary } from '../contracts/dashboard';
+import { formatMoney } from '../components/ui';
 
 type LoadState =
   | { kind: 'loading' }
@@ -11,6 +12,14 @@ type LoadState =
   | { kind: 'ready'; summary: DashboardSummary };
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+/** Indicators whose value is an amount of money (PKR), not a count. */
+const MONEY_INDICATORS = new Set(['outstandingVendorPayments', 'pendingRecovery']);
+
+function formatIndicator(indicator: DashboardIndicator): string {
+  const value = indicator.value ?? 0;
+  return MONEY_INDICATORS.has(indicator.key) ? formatMoney(value) : value.toLocaleString();
+}
 
 function IndicatorCard({ indicator }: { indicator: DashboardIndicator }) {
   const available = indicator.status === 'available' && indicator.value !== null;
@@ -24,7 +33,7 @@ function IndicatorCard({ indicator }: { indicator: DashboardIndicator }) {
       </h3>
       {available ? (
         <p className="mt-2 text-3xl font-semibold tabular-nums text-slate-900">
-          {indicator.value?.toLocaleString()}
+          {formatIndicator(indicator)}
         </p>
       ) : (
         <p className="mt-2">

@@ -98,4 +98,30 @@ describe('Purchase orders list', () => {
     expect(lastCall.path).toBe('/api/purchase-orders');
     expect(lastCall.search.get('deliveryRoute')).toBe('DIRECT');
   });
+
+  it('shows completion and payment status badges for each order', async () => {
+    mockApi({
+      ...session(viewerSession),
+      ...poMasterRoutes(),
+      'GET /api/purchase-orders': poListResponse([
+        poSummary(1, {
+          completion: 'PARTIAL',
+          totalReceived: 200,
+          paymentStatus: 'PARTIAL',
+          paidAmount: 20000,
+          outstandingAmount: 30000,
+        }),
+        poSummary(2, { completion: 'COMPLETE', totalReceived: 500, paymentStatus: 'PAID' }),
+      ]),
+    });
+    renderApp('/purchase-orders');
+    await screen.findByRole('link', { name: 'DIT/0001' });
+    const rows = within(screen.getByRole('table')).getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('Partially received');
+    expect(rows[1]).toHaveTextContent('200 / 500 received');
+    expect(rows[1]).toHaveTextContent('Partially paid');
+    expect(rows[1]).toHaveTextContent('PKR 30,000.00 due');
+    expect(rows[2]).toHaveTextContent('Complete');
+    expect(rows[2]).toHaveTextContent('Paid');
+  });
 });

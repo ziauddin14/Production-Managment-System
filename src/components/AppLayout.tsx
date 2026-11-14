@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { ROLE_LABELS } from '../contracts/auth';
+import { LoadingRows } from './ui';
 import { ACTIVE_MODULES, DASHBOARD_NAV, PLANNED_MODULES, type NavItem } from '../navigation';
 
 function navClass({ isActive }: { isActive: boolean }): string {
@@ -57,14 +58,18 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
             <NavEntry key={item.key} item={item} onNavigate={onNavigate} />
           ))}
         </ul>
-        <p className="mt-6 px-3 text-[11px] font-semibold uppercase tracking-wider text-emerald-200/80">
-          Planned modules
-        </p>
-        <ul className="mt-2 space-y-1">
-          {PLANNED_MODULES.map((item) => (
-            <NavEntry key={item.key} item={item} onNavigate={onNavigate} />
-          ))}
-        </ul>
+        {PLANNED_MODULES.length > 0 && (
+          <>
+            <p className="mt-6 px-3 text-[11px] font-semibold uppercase tracking-wider text-emerald-200/80">
+              Planned modules
+            </p>
+            <ul className="mt-2 space-y-1">
+              {PLANNED_MODULES.map((item) => (
+                <NavEntry key={item.key} item={item} onNavigate={onNavigate} />
+              ))}
+            </ul>
+          </>
+        )}
       </nav>
     </div>
   );
@@ -102,22 +107,22 @@ export function AppLayout() {
   const user = session?.user;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 print:min-h-0 print:bg-white">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:shadow"
+        className="print:hidden sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:shadow"
       >
         Skip to main content
       </a>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 bg-emerald-900 lg:block">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 bg-emerald-900 lg:block print:hidden">
         <SidebarContent onNavigate={closeMenu} />
       </aside>
 
       {/* Mobile drawer */}
       {menuOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-40 lg:hidden print:hidden">
           <div
             className="absolute inset-0 bg-slate-900/50"
             aria-hidden="true"
@@ -144,8 +149,8 @@ export function AppLayout() {
         </div>
       )}
 
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+      <div className="lg:pl-64 print:pl-0">
+        <header className="print:hidden sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
           <button
             ref={menuButtonRef}
             type="button"
@@ -177,8 +182,13 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main id="main-content" className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">
-          <Outlet />
+        <main
+          id="main-content"
+          className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8 print:max-w-none print:p-0"
+        >
+          <Suspense fallback={<LoadingRows label="Loading page" rows={6} />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

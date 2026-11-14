@@ -1,12 +1,23 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
-import { AlertTriangle, ArrowLeft, CreditCard, Edit, FileText, Truck, XCircle } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CreditCard,
+  Edit,
+  FileText,
+  PackageCheck,
+  Truck,
+  Wallet,
+  XCircle,
+} from 'lucide-react';
 import { ApiError, cancelPurchaseOrder, getPurchaseOrder } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 import {
   ErrorPanel,
   formatDateOnly,
   formatDateTime,
+  formatMoney,
   inputClass,
   LoadingRows,
   Notice,
@@ -18,6 +29,8 @@ import {
   PO_COMPLETION_LABELS,
   type PurchaseOrderDetail,
 } from '../../contracts/purchaseOrders';
+import { PAYMENT_STATUS_LABELS } from '../../contracts/operations';
+import { PurchaseOrderPayments, PurchaseOrderReceipts } from './PurchaseOrderActivity';
 
 export function PurchaseOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -123,7 +136,7 @@ export function PurchaseOrderDetailPage() {
             <ArrowLeft className="h-4 w-4" />
             Back to purchase orders
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold text-slate-900">{po.poNumber}</h1>
             <span className="font-mono text-sm text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
               {po.code}
@@ -142,11 +155,34 @@ export function PurchaseOrderDetailPage() {
             >
               {PO_COMPLETION_LABELS[po.completion]}
             </StatusBadge>
+            <StatusBadge
+              tone={
+                po.paymentStatus === 'PAID'
+                  ? 'green'
+                  : po.paymentStatus === 'PARTIAL'
+                    ? 'amber'
+                    : 'grey'
+              }
+            >
+              {PAYMENT_STATUS_LABELS[po.paymentStatus]}
+            </StatusBadge>
           </div>
         </div>
 
         {canWrite && !isCancelled && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {po.lines.some((l) => l.quantityRemaining > 0) && (
+              <Link to={`/receiving/new?purchaseOrderId=${po.id}`} className={secondaryButton}>
+                <PackageCheck className="h-4 w-4" aria-hidden="true" />
+                Record receipt
+              </Link>
+            )}
+            {po.outstandingAmount > 0 && (
+              <Link to={`/payments/new?purchaseOrderId=${po.id}`} className={secondaryButton}>
+                <Wallet className="h-4 w-4" aria-hidden="true" />
+                Record payment
+              </Link>
+            )}
             <Link to={`/purchase-orders/${po.id}/edit`} className={secondaryButton}>
               <Edit className="h-4 w-4" />
               Edit
@@ -262,6 +298,18 @@ export function PurchaseOrderDetailPage() {
                 PKR {po.approvedAmount.toLocaleString()}
               </span>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-slate-500 block text-xs">Paid</span>
+                <span className="font-semibold text-slate-900">{formatMoney(po.paidAmount)}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-xs">Outstanding</span>
+                <span className="font-semibold text-amber-800">
+                  {formatMoney(po.outstandingAmount)}
+                </span>
+              </div>
+            </div>
             <div>
               <span className="text-slate-500 block text-xs">Sum of Item Lines</span>
               <span className="font-medium text-slate-900">
@@ -364,8 +412,8 @@ export function PurchaseOrderDetailPage() {
         <div className="px-5 py-3 border-b border-slate-100 font-semibold text-slate-800 text-sm flex justify-between items-center">
           <span>Items Ordered ({po.lineCount})</span>
           <span className="text-xs text-slate-500 font-normal">
-            Total quantity:{' '}
-            <strong className="text-slate-900">{po.totalQuantity.toLocaleString()}</strong> pcs
+            Received <strong className="text-slate-900">{po.totalReceived.toLocaleString()}</strong>{' '}
+            of <strong className="text-slate-900">{po.totalQuantity.toLocaleString()}</strong> pcs
           </span>
         </div>
         <div className="overflow-x-auto">
@@ -444,8 +492,10 @@ export function PurchaseOrderDetailPage() {
                   Total:
                 </td>
                 <td className="px-4 py-3 text-right">{po.totalQuantity.toLocaleString()} pcs</td>
-                <td className="px-4 py-3 text-right">0 pcs</td>
-                <td className="px-4 py-3 text-right">{po.totalQuantity.toLocaleString()} pcs</td>
+                <td className="px-4 py-3 text-right">{po.totalReceived.toLocaleString()} pcs</td>
+                <td className="px-4 py-3 text-right">
+                  {Math.max(0, po.totalQuantity - po.totalReceived).toLocaleString()} pcs
+                </td>
                 <td className="px-4 py-3" />
                 <td className="px-4 py-3 text-right">PKR {po.totalAmount.toLocaleString()}</td>
                 <td className="px-4 py-3" />
@@ -453,6 +503,11 @@ export function PurchaseOrderDetailPage() {
             </tfoot>
           </table>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <PurchaseOrderReceipts purchaseOrderId={po.id} />
+        <PurchaseOrderPayments purchaseOrderId={po.id} />
       </div>
 
       {/* Cancellation Modal */}

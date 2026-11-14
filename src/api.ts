@@ -22,6 +22,45 @@ import {
   type DemandListResponse,
   type DemandPayload,
 } from './contracts/demands';
+import {
+  dispatchDetailSchema,
+  dispatchListResponseSchema,
+  paymentListResponseSchema,
+  paymentSchema,
+  receiptDetailSchema,
+  receiptListResponseSchema,
+  reportResponseSchema,
+  stockBalanceResponseSchema,
+  stockMovementResponseSchema,
+  syncJobListResponseSchema,
+  syncJobSchema,
+  syncSummarySchema,
+  type DispatchDetail,
+  type DispatchListParams,
+  type DispatchListResponse,
+  type DispatchPayload,
+  type DispatchUpdatePayload,
+  type Payment,
+  type PaymentListParams,
+  type PaymentListResponse,
+  type PaymentPayload,
+  type ReceiptDetail,
+  type ReceiptListParams,
+  type ReceiptListResponse,
+  type ReceiptPayload,
+  type ReportKey,
+  type ReportParams,
+  type ReportResponse,
+  type StockBalance,
+  type StockBalanceParams,
+  type StockBalanceResponse,
+  type StockMovementParams,
+  type StockMovementResponse,
+  type SyncJob,
+  type SyncJobListParams,
+  type SyncJobListResponse,
+  type SyncSummary,
+} from './contracts/operations';
 import { apiBaseUrl } from './config';
 
 /** An error returned by the PMS API, with its machine-readable code and safe message. */
@@ -48,6 +87,30 @@ interface RequestOptions {
   body?: unknown;
   csrfToken?: string;
   signal?: AbortSignal;
+}
+
+/** Turns a failed response into an ApiError, using the server's error body when it has one. */
+async function errorFromResponse(response: Response): Promise<ApiError> {
+  const parsed = apiErrorResponseSchema.safeParse(await response.json().catch(() => null));
+  if (parsed.success) {
+    const { code, message, details } = parsed.data.error;
+    return new ApiError(response.status, code, message, details);
+  }
+  return new ApiError(
+    response.status,
+    'UNKNOWN_ERROR',
+    `Unexpected server response (${response.status})`,
+  );
+}
+
+/** Builds "?a=1&b=2" from defined, non-empty values (or "" when there are none). */
+export function toQueryString(params: object): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  }
+  const text = query.toString();
+  return text ? `?${text}` : '';
 }
 
 /**
@@ -81,18 +144,7 @@ export async function apiRequest<T>(
     );
   }
 
-  if (!response.ok) {
-    const parsed = apiErrorResponseSchema.safeParse(await response.json().catch(() => null));
-    if (parsed.success) {
-      const { code, message, details } = parsed.data.error;
-      throw new ApiError(response.status, code, message, details);
-    }
-    throw new ApiError(
-      response.status,
-      'UNKNOWN_ERROR',
-      `Unexpected server response (${response.status})`,
-    );
-  }
+  if (!response.ok) throw await errorFromResponse(response);
   if (response.status === 204 || schema === null) return undefined as T;
   const result = schema.safeParse(await response.json().catch(() => null));
   if (!result.success) {
@@ -290,4 +342,193 @@ export function cancelPurchaseOrder(
     body,
     csrfToken,
   });
+}
+
+// ---- M7 Goods receiving and stock ----------------------------------------------------------
+
+export function listReceipts(
+  params: ReceiptListParams,
+  signal?: AbortSignal,
+): Promise<ReceiptListResponse> {
+  return apiRequest(`/api/receipts${toQueryString(params)}`, receiptListResponseSchema, {
+    signal,
+  });
+}
+
+export function getReceipt(id: string, signal?: AbortSignal): Promise<ReceiptDetail> {
+  return apiRequest(`/api/receipts/${id}`, receiptDetailSchema, { signal });
+}
+
+export function createReceipt(body: ReceiptPayload, csrfToken: string): Promise<ReceiptDetail> {
+  return apiRequest('/api/receipts', receiptDetailSchema, { method: 'POST', body, csrfToken });
+}
+
+export function cancelReceipt(
+  id: string,
+  body: { rev: number; reason: string },
+  csrfToken: string,
+): Promise<ReceiptDetail> {
+  return apiRequest(`/api/receipts/${id}/cancel`, receiptDetailSchema, {
+    method: 'POST',
+    body,
+    csrfToken,
+  });
+}
+
+export function listStockBalances(
+  params: StockBalanceParams,
+  signal?: AbortSignal,
+): Promise<StockBalanceResponse> {
+  return apiRequest(`/api/stock/balances${toQueryString(params)}`, stockBalanceResponseSchema, {
+    signal,
+  });
+}
+
+/** Loads every stock balance matching the filter (pages of 100), for selection lists. */
+export async function listAllStockBalances(
+  params: Omit<StockBalanceParams, 'page' | 'pageSize'>,
+  signal?: AbortSignal,
+): Promise<StockBalance[]> {
+  const all: StockBalance[] = [];
+  for (let page = 1; page <= 50; page += 1) {
+    const result = await listStockBalances({ ...params, page, pageSize: 100 }, signal);
+    all.push(...result.items);
+    if (all.length >= result.total || result.items.length === 0) break;
+  }
+  return all;
+}
+
+export function listStockMovements(
+  params: StockMovementParams,
+  signal?: AbortSignal,
+): Promise<StockMovementResponse> {
+  return apiRequest(`/api/stock/movements${toQueryString(params)}`, stockMovementResponseSchema, {
+    signal,
+  });
+}
+
+// ---- M8 Dispatch / Bilty --------------------------------------------------------------------
+
+export function listDispatches(
+  params: DispatchListParams,
+  signal?: AbortSignal,
+): Promise<DispatchListResponse> {
+  return apiRequest(`/api/dispatches${toQueryString(params)}`, dispatchListResponseSchema, {
+    signal,
+  });
+}
+
+export function getDispatch(id: string, signal?: AbortSignal): Promise<DispatchDetail> {
+  return apiRequest(`/api/dispatches/${id}`, dispatchDetailSchema, { signal });
+}
+
+export function createDispatch(body: DispatchPayload, csrfToken: string): Promise<DispatchDetail> {
+  return apiRequest('/api/dispatches', dispatchDetailSchema, { method: 'POST', body, csrfToken });
+}
+
+export function updateDispatch(
+  id: string,
+  body: DispatchUpdatePayload,
+  csrfToken: string,
+): Promise<DispatchDetail> {
+  return apiRequest(`/api/dispatches/${id}`, dispatchDetailSchema, {
+    method: 'PATCH',
+    body,
+    csrfToken,
+  });
+}
+
+export function cancelDispatch(
+  id: string,
+  body: { rev: number; reason: string },
+  csrfToken: string,
+): Promise<DispatchDetail> {
+  return apiRequest(`/api/dispatches/${id}/cancel`, dispatchDetailSchema, {
+    method: 'POST',
+    body,
+    csrfToken,
+  });
+}
+
+// ---- M9 Vendor payments ---------------------------------------------------------------------
+
+export function listPayments(
+  params: PaymentListParams,
+  signal?: AbortSignal,
+): Promise<PaymentListResponse> {
+  return apiRequest(`/api/payments${toQueryString(params)}`, paymentListResponseSchema, {
+    signal,
+  });
+}
+
+export function getPayment(id: string, signal?: AbortSignal): Promise<Payment> {
+  return apiRequest(`/api/payments/${id}`, paymentSchema, { signal });
+}
+
+export function createPayment(body: PaymentPayload, csrfToken: string): Promise<Payment> {
+  return apiRequest('/api/payments', paymentSchema, { method: 'POST', body, csrfToken });
+}
+
+export function cancelPayment(
+  id: string,
+  body: { rev: number; reason: string },
+  csrfToken: string,
+): Promise<Payment> {
+  return apiRequest(`/api/payments/${id}/cancel`, paymentSchema, {
+    method: 'POST',
+    body,
+    csrfToken,
+  });
+}
+
+// ---- M10 Excel sync status ------------------------------------------------------------------
+
+export function getSyncSummary(signal?: AbortSignal): Promise<SyncSummary> {
+  return apiRequest('/api/sync/summary', syncSummarySchema, { signal });
+}
+
+export function listSyncJobs(
+  params: SyncJobListParams,
+  signal?: AbortSignal,
+): Promise<SyncJobListResponse> {
+  return apiRequest(`/api/sync/jobs${toQueryString(params)}`, syncJobListResponseSchema, {
+    signal,
+  });
+}
+
+export function retrySyncJob(id: string, csrfToken: string): Promise<SyncJob> {
+  return apiRequest(`/api/sync/jobs/${id}/retry`, syncJobSchema, { method: 'POST', csrfToken });
+}
+
+// ---- M11 Reports ----------------------------------------------------------------------------
+
+export function getReport(
+  key: ReportKey,
+  params: ReportParams,
+  signal?: AbortSignal,
+): Promise<ReportResponse> {
+  return apiRequest(
+    `/api/reports/${key}${toQueryString({ ...params, format: 'json' })}`,
+    reportResponseSchema,
+    { signal },
+  );
+}
+
+/** Downloads a report as CSV. The session cookie is sent, so the request is authenticated. */
+export async function downloadReportCsv(key: ReportKey, params: ReportParams): Promise<Blob> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${apiBaseUrl()}/api/reports/${key}${toQueryString({ ...params, format: 'csv' })}`,
+      { method: 'GET', headers: { Accept: 'text/csv' }, credentials: 'include' },
+    );
+  } catch {
+    throw new ApiError(
+      0,
+      'NETWORK_ERROR',
+      'The PMS server could not be reached. Check your connection and try again.',
+    );
+  }
+  if (!response.ok) throw await errorFromResponse(response);
+  return response.blob();
 }

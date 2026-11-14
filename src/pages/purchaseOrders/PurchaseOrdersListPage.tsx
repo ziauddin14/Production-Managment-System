@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/AuthContext';
 import {
   ErrorPanel,
   formatDateOnly,
+  formatMoney,
   inputClass,
   LoadingRows,
   primaryButton,
@@ -21,6 +22,7 @@ import {
   type PurchaseOrderStatusFilter,
 } from '../../contracts/purchaseOrders';
 import type { MasterRecord } from '../../contracts/masterData';
+import { PAYMENT_STATUS_LABELS } from '../../contracts/operations';
 
 const PAGE_SIZE = 25;
 
@@ -331,6 +333,9 @@ export function PurchaseOrdersListPage() {
                   <th scope="col" className="px-4 py-3">
                     Completion
                   </th>
+                  <th scope="col" className="px-4 py-3">
+                    Payment
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -408,6 +413,28 @@ export function PurchaseOrdersListPage() {
                       >
                         {PO_COMPLETION_LABELS[po.completion]}
                       </StatusBadge>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {po.totalReceived.toLocaleString()} / {po.totalQuantity.toLocaleString()}{' '}
+                        received
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <StatusBadge
+                        tone={
+                          po.paymentStatus === 'PAID'
+                            ? 'green'
+                            : po.paymentStatus === 'PARTIAL'
+                              ? 'amber'
+                              : 'grey'
+                        }
+                      >
+                        {PAYMENT_STATUS_LABELS[po.paymentStatus]}
+                      </StatusBadge>
+                      {po.paymentStatus !== 'PAID' && (
+                        <div className="mt-1 text-xs text-slate-500">
+                          {formatMoney(po.outstandingAmount)} due
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
