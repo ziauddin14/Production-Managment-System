@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { NavLink, Navigate, useParams } from 'react-router';
 import { AlertTriangle, CircleCheck, Eye, Pencil, Plus, RefreshCw, Search } from 'lucide-react';
-import { ApiError, listMasterRecords, updateMasterRecord } from '../../api';
+import { ApiError, listAllMasterRecords, listMasterRecords, updateMasterRecord } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 import {
   MASTER_ENTITY_META,
+  ancestorsOf,
   masterEntityKeys,
   type MasterEntityKey,
   type MasterListResponse,
@@ -70,26 +71,37 @@ function MasterList({ entity }: { entity: MasterEntityKey }) {
   const meta = MASTER_ENTITY_META[entity];
   const canWrite = session?.user.role === 'OPERATOR';
   const csrfToken = session?.csrfToken ?? '';
+  // Location lists show every level above them (e.g. cities: province, division, district).
+  const ancestors = ancestorsOf(entity);
+  const parentLevel = ancestors.at(-1);
+  const grandParentLevel = ancestors.at(-2);
+  const showContact = entity === 'vendors';
 
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<MasterStatusFilter>('active');
-  const [provinceId, setProvinceId] = useState('');
+  const [parentId, setParentId] = useState('');
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
   const [result, setResult] = useState<Result | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [provinces, setProvinces] = useState<MasterRecord[]>([]);
+  const [parentOptions, setParentOptions] = useState<MasterRecord[]>([]);
 
-  const requestKey = JSON.stringify({ entity, search, status, provinceId, page, reload });
+  const requestKey = JSON.stringify({ entity, search, status, parentId, page, reload });
 
   useEffect(() => {
     const controller = new AbortController();
     listMasterRecords(
       entity,
-      { search, status, page, pageSize: PAGE_SIZE, provinceId: provinceId || undefined },
+      {
+        search,
+        status,
+        page,
+        pageSize: PAGE_SIZE,
+        ...(parentLevel && parentId ? { [parentLevel.field]: parentId } : {}),
+      },
       controller.signal,
     )
       .then((data) => setResult({ key: requestKey, kind: 'ready', data }))
@@ -102,24 +114,24 @@ function MasterList({ entity }: { entity: MasterEntityKey }) {
         });
       });
     return () => controller.abort();
-  }, [entity, search, status, provinceId, page, requestKey, handleApiError]);
+  }, [entity, search, status, parentId, parentLevel, page, requestKey, handleApiError]);
 
-  // Province filter options for divisions (all provinces, so inactive ones can be filtered too).
+  // Parent filter options (all records, so inactive ones can be filtered too).
   useEffect(() => {
-    if (entity !== 'divisions') return;
+    if (!parentLevel) return;
     const controller = new AbortController();
-    listMasterRecords('provinces', { status: 'all', pageSize: 100 }, controller.signal)
-      .then((data) => setProvinces(data.items))
+    listAllMasterRecords(parentLevel.entity, 'all', controller.signal)
+      .then((items) => setParentOptions(items))
       .catch((error: unknown) => {
         if (!controller.signal.aborted) handleApiError(error);
       });
     return () => controller.abort();
-  }, [entity, handleApiError, reload]);
+  }, [parentLevel, handleApiError, reload]);
 
   const loading = result === null || result.key !== requestKey;
   const data = !loading && result?.kind === 'ready' ? result.data : null;
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
-  const filtered = Boolean(search) || status !== 'active' || Boolean(provinceId);
+  const filtered = Boolean(search) || status !== 'active' || Boolean(parentId);
 
   const refresh = useCallback(() => setReload((n) => n + 1), []);
   const closeDialog = useCallback(() => setDialog(null), []);
@@ -272,29 +284,33 @@ function MasterList({ entity }: { entity: MasterEntityKey }) {
               <option value="all">All</option>
             </select>
           </div>
-          {entity === 'divisions' && (
-            <div className="flex flex-col">
-              <label
-                htmlFor="master-province-filter"
-                className="text-xs font-medium text-slate-600"
-              >
-                Province
+          {parentLevel && (
+            <div className="flex min-w-0 flex-col">
+              <label htmlFor="master-parent-filter" className="text-xs font-medium text-slate-600">
+                {parentLevel.label}
               </label>
               <select
-                id="master-province-filter"
-                value={provinceId}
+                id="master-parent-filter"
+                value={parentId}
                 onChange={(e) => {
-                  setProvinceId(e.target.value);
+                  setParentId(e.target.value);
                   setPage(1);
                 }}
-                className={`mt-1 ${controlClass}`}
+                className={`mt-1 max-w-full sm:max-w-xs ${controlClass}`}
               >
-                <option value="">All provinces</option>
-                {provinces.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.active ? p.name : `${p.name} (inactive)`}
-                  </option>
-                ))}
+                <option value="">
+                  All {MASTER_ENTITY_META[parentLevel.entity].label.toLowerCase()}
+                </option>
+                {parentOptions.map((p) => {
+                  // Names repeat across provinces/divisions, so show the level above as well.
+                  const above = grandParentLevel ? p[grandParentLevel.nameField] : undefined;
+                  const label = above ? `${p.name} — ${above}` : p.name;
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {p.active ? label : `${label} (inactive)`}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           )}
@@ -350,12 +366,17 @@ function MasterList({ entity }: { entity: MasterEntityKey }) {
                   <th scope="col" className="px-4 py-3">
                     Code
                   </th>
+                  {ancestors.map((level) => (
+                    <th key={level.field} scope="col" className="px-4 py-3">
+                      {level.label}
+                    </th>
+                  ))}
                   <th scope="col" className="px-4 py-3">
-                    Name
+                    {meta.nameHeader}
                   </th>
-                  {entity === 'divisions' && (
+                  {showContact && (
                     <th scope="col" className="px-4 py-3">
-                      Province
+                      Contact person
                     </th>
                   )}
                   <th scope="col" className="px-4 py-3">
@@ -374,9 +395,14 @@ function MasterList({ entity }: { entity: MasterEntityKey }) {
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-500">
                       {record.code}
                     </td>
+                    {ancestors.map((level) => (
+                      <td key={level.field} className="px-4 py-3 text-slate-700">
+                        {record[level.nameField] ?? '—'}
+                      </td>
+                    ))}
                     <td className="px-4 py-3 font-medium text-slate-900">{record.name}</td>
-                    {entity === 'divisions' && (
-                      <td className="px-4 py-3 text-slate-700">{record.provinceName ?? '—'}</td>
+                    {showContact && (
+                      <td className="px-4 py-3 text-slate-700">{record.contactPerson || '—'}</td>
                     )}
                     <td className="px-4 py-3">
                       <span

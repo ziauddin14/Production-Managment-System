@@ -196,13 +196,23 @@ export function listMasterRecords(
   if (params.page) query.set('page', String(params.page));
   if (params.pageSize) query.set('pageSize', String(params.pageSize));
   if (params.provinceId) query.set('provinceId', params.provinceId);
+  if (params.divisionId) query.set('divisionId', params.divisionId);
+  if (params.districtId) query.set('districtId', params.districtId);
   const suffix = query.toString() ? `?${query.toString()}` : '';
   return apiRequest(`/api/master/${entity}${suffix}`, masterListResponseSchema, { signal });
 }
 
+/** Optional fields of a master record write; each list accepts only its own. */
+export interface MasterWriteFields {
+  provinceId?: string;
+  divisionId?: string;
+  districtId?: string;
+  contactPerson?: string;
+}
+
 export function createMasterRecord(
   entity: MasterEntityKey,
-  body: { name: string; provinceId?: string },
+  body: { name: string } & MasterWriteFields,
   csrfToken: string,
 ): Promise<MasterRecord> {
   return apiRequest(`/api/master/${entity}`, masterRecordSchema, {
@@ -215,7 +225,7 @@ export function createMasterRecord(
 export function updateMasterRecord(
   entity: MasterEntityKey,
   id: string,
-  body: { rev: number; name?: string; provinceId?: string; active?: boolean },
+  body: { rev: number; name?: string; active?: boolean } & MasterWriteFields,
   csrfToken: string,
 ): Promise<MasterRecord> {
   return apiRequest(`/api/master/${entity}/${id}`, masterRecordSchema, {

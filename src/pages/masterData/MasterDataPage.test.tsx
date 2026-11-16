@@ -237,7 +237,7 @@ describe('Master data — create, edit and deactivate', () => {
     });
     renderApp('/master-data/vendors');
     await user.click(await screen.findByRole('button', { name: 'New vendor' }));
-    await user.type(screen.getByLabelText('Name'), 'Synthetic Vendor');
+    await user.type(screen.getByLabelText('Company name'), 'Synthetic Vendor');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     const dialog = screen.getByRole('dialog');
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
@@ -266,7 +266,7 @@ describe('Master data — create, edit and deactivate', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
     expect(within(dialog).getByText('Choose a province.')).toBeInTheDocument();
 
-    await user.type(within(dialog).getByLabelText('Name'), 'Synthetic Division');
+    await user.type(within(dialog).getByLabelText('Division name'), 'Synthetic Division');
     await user.selectOptions(await within(dialog).findByLabelText('Province'), province.id);
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
     expect(await within(dialog).findByText(/is inactive/)).toBeInTheDocument();
@@ -319,6 +319,111 @@ describe('Master data — create, edit and deactivate', () => {
     await user.click(screen.getByRole('button', { name: 'New item' }));
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('Master data — districts, cities and vendor contacts', () => {
+  const province = record('Synthetic Province');
+  const division = record('Synthetic Division', {
+    provinceId: province.id,
+    provinceName: province.name,
+  });
+  const district = record('Synthetic District', {
+    divisionId: division.id,
+    divisionName: division.name,
+    provinceId: province.id,
+    provinceName: province.name,
+  });
+
+  it('shows province, division and district columns for cities', async () => {
+    mockApi({
+      ...session(),
+      'GET /api/master/districts': page([district]),
+      'GET /api/master/cities': page([
+        record('Synthetic City', {
+          districtId: district.id,
+          districtName: district.name,
+          divisionId: division.id,
+          divisionName: division.name,
+          provinceId: province.id,
+          provinceName: province.name,
+        }),
+      ]),
+    });
+    renderApp('/master-data/cities');
+    const table = await screen.findByRole('table', { name: 'Cities' });
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual(['Code', 'Province', 'Division', 'District', 'City', 'Status', 'Actions']);
+    expect(within(table).getByRole('cell', { name: 'Synthetic District' })).toBeInTheDocument();
+    // The district filter names the division too, because district names repeat.
+    expect(
+      await screen.findByRole('option', { name: 'Synthetic District — Synthetic Division' }),
+    ).toBeInTheDocument();
+  });
+
+  it('creates a city by choosing province, then division, then district', async () => {
+    const user = userEvent.setup();
+    const { calls } = mockApi({
+      ...session(),
+      'GET /api/master/cities': page([]),
+      'GET /api/master/provinces': page([province]),
+      'GET /api/master/divisions': page([division]),
+      'GET /api/master/districts': page([district]),
+      'POST /api/master/cities': json(201, record('Synthetic City', { code: 'CTY-000001' })),
+    });
+    renderApp('/master-data/cities');
+    await user.click(await screen.findByRole('button', { name: 'New city' }));
+    const dialog = screen.getByRole('dialog', { name: 'New city' });
+    expect(within(dialog).getByLabelText('Division')).toBeDisabled();
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    expect(within(dialog).getByText('Choose a district.')).toBeInTheDocument();
+
+    await user.selectOptions(await within(dialog).findByLabelText('Province'), province.id);
+    await waitFor(() => expect(within(dialog).getByLabelText('Division')).toBeEnabled());
+    await user.selectOptions(within(dialog).getByLabelText('Division'), division.id);
+    await waitFor(() => expect(within(dialog).getByLabelText('District')).toBeEnabled());
+    await user.selectOptions(within(dialog).getByLabelText('District'), district.id);
+    await user.type(within(dialog).getByLabelText('City name'), 'Synthetic City');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Created CTY-000001');
+    const post = calls.find((c) => c.method === 'POST');
+    expect(JSON.parse(String(post?.init?.body))).toEqual({
+      name: 'Synthetic City',
+      districtId: district.id,
+    });
+    const divisionsCall = calls.find((c) => c.path === '/api/master/divisions');
+    expect(divisionsCall?.search.get('provinceId')).toBe(province.id);
+  });
+
+  it('shows and saves the vendor contact person', async () => {
+    const user = userEvent.setup();
+    const vendor = record('Synthetic Traders', { contactPerson: 'Synthetic Person' });
+    const { calls } = mockApi({
+      ...session(),
+      'GET /api/master/vendors': page([vendor]),
+      [`PATCH /api/master/vendors/${vendor.id}`]: json(200, {
+        ...vendor,
+        contactPerson: 'Synthetic Other',
+        rev: 2,
+      }),
+    });
+    renderApp('/master-data/vendors');
+    expect(await screen.findByRole('cell', { name: 'Synthetic Person' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit Synthetic Traders' }));
+    const contact = screen.getByLabelText(/Contact person/);
+    await user.clear(contact);
+    await user.type(contact, 'Synthetic Other');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('status');
+    const patch = calls.find((c) => c.method === 'PATCH');
+    expect(JSON.parse(String(patch?.init?.body))).toEqual({
+      rev: 1,
+      contactPerson: 'Synthetic Other',
+    });
   });
 });
 
