@@ -11,6 +11,13 @@ import {
 } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 import {
+  DocumentsEditor,
+  documentsPayload,
+  newDocumentRow,
+  validateDocuments,
+  type DocumentRow,
+} from '../../components/Documents';
+import {
   ErrorPanel,
   inputClass,
   LoadingRows,
@@ -214,6 +221,9 @@ function PurchaseOrderForm({
     po?.expectedCompletionDate ?? '',
   );
   const [notes, setNotes] = useState(po?.notes ?? '');
+  const [documents, setDocuments] = useState<DocumentRow[]>(() =>
+    (po?.documents ?? []).map((d) => newDocumentRow(d)),
+  );
 
   // Invoice fields
   const [invoiceNo, setInvoiceNo] = useState(po?.invoice?.invoiceNo ?? '');
@@ -360,6 +370,8 @@ function PurchaseOrderForm({
       }
     });
 
+    validateDocuments(documents, clientErrors);
+
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors);
       setSubmitError('Please fix the errors below.');
@@ -395,6 +407,7 @@ function PurchaseOrderForm({
         plannedAmount: parseFloat(s.plannedAmount) || 0,
         note: s.note.trim() || null,
       })),
+      documents: documentsPayload(documents),
       lines: lines.map((l) => ({
         ...(l.id ? { id: l.id } : {}),
         itemId: l.itemId,
@@ -1016,6 +1029,14 @@ function PurchaseOrderForm({
             className={`${inputClass()} mt-1`}
           />
         </div>
+
+        <DocumentsEditor
+          rows={documents}
+          onChange={setDocuments}
+          errors={fieldErrors}
+          uploadPurpose="purchase-order"
+          hint="e.g. invoice photo"
+        />
       </div>
 
       {/* Actions */}

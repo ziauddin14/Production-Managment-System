@@ -28,7 +28,7 @@ import {
   RecordStatusBadge,
   secondaryButton,
 } from '../../components/ui';
-import { LOCATION_KIND_LABELS, type DispatchDetail } from '../../contracts/operations';
+import { LOCATION_KIND_LABELS, lotHref, type DispatchDetail } from '../../contracts/operations';
 import { useResource } from '../../hooks/useResource';
 import { TransportFields } from './TransportFields';
 
@@ -160,7 +160,11 @@ export function DispatchDetailPage() {
                   {formatDateTime(d.createdAt)}
                   {d.createdBy && ` by ${d.createdBy}`}
                 </Field>
-                {d.notes && <Field label="Notes">{d.notes}</Field>}
+                {d.notes && (
+                  <Field label="Notes">
+                    <span className="whitespace-pre-wrap">{d.notes}</span>
+                  </Field>
+                )}
               </dl>
               <div className="mt-4">
                 <h3 className="text-sm font-medium text-slate-500">Supporting documents</h3>
@@ -203,10 +207,7 @@ export function DispatchDetailPage() {
                       <td className="px-4 py-3 tabular-nums text-slate-500">{line.lineNo}</td>
                       <td className="px-4 py-3 font-medium text-slate-900">{line.item.name}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <Link
-                          to={`/purchase-orders/${line.lot.purchaseOrderId}`}
-                          className={linkClass}
-                        >
+                        <Link to={lotHref(line.lot)} className={linkClass}>
                           {line.lot.poNumber}
                         </Link>
                         <span className="text-xs text-slate-500"> · line {line.lot.poLineNo}</span>
@@ -345,7 +346,12 @@ function TransportEditor({
         setters={{ setBiltyNo, setTransporterName, setVehicleNo, setFreightAmount, setNotes }}
         errors={errors}
       />
-      <DocumentsEditor rows={documents} onChange={setDocuments} errors={errors} />
+      <DocumentsEditor
+        rows={documents}
+        onChange={setDocuments}
+        errors={errors}
+        uploadPurpose="dispatch"
+      />
       <div className="flex justify-end gap-3">
         <button type="button" onClick={onClose} disabled={saving} className={secondaryButton}>
           Discard changes

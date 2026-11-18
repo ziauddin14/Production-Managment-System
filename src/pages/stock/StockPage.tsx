@@ -1,6 +1,13 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { listAllMasterRecords, listStockBalances, listStockMovements } from '../../api';
+import { Plus } from 'lucide-react';
+import {
+  listAllMasterRecords,
+  listOpeningStock,
+  listStockBalances,
+  listStockMovements,
+} from '../../api';
+import { useAuth } from '../../auth/AuthContext';
 import { datesInvalid } from '../../components/RecordFilters';
 import {
   EmptyState,
@@ -11,11 +18,14 @@ import {
   linkClass,
   LoadingRows,
   Pagination,
+  primaryButton,
+  RecordStatusBadge,
   StatusBadge,
 } from '../../components/ui';
 import type { MasterRecord } from '../../contracts/masterData';
 import {
   LOCATION_KIND_LABELS,
+  lotHref,
   MOVEMENT_TYPE_LABELS,
   stockMovementTypes,
   type PoLotRef,
@@ -26,7 +36,13 @@ import {
 import { useResource } from '../../hooks/useResource';
 
 const PAGE_SIZE = 25;
-type Tab = 'balances' | 'ledger';
+const TABS = ['balances', 'opening', 'ledger'] as const;
+type Tab = (typeof TABS)[number];
+const TAB_LABELS: Record<Tab, string> = {
+  balances: 'Balances',
+  opening: 'Opening stock',
+  ledger: 'Ledger',
+};
 
 interface LocationFilter {
   kind: StockLocationKind | '';
@@ -42,7 +58,10 @@ interface Masters {
 
 export function StockPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab: Tab = searchParams.get('tab') === 'ledger' ? 'ledger' : 'balances';
+  const { session } = useAuth();
+  const canWrite = session?.user.role === 'OPERATOR';
+  const requested = searchParams.get('tab');
+  const tab: Tab = TABS.find((t) => t === requested) ?? 'balances';
   const masters = useResource<Masters>(
     'stock-masters',
     async (signal) => {
@@ -57,10 +76,11 @@ export function StockPage() {
   );
   const lists = masters.data ?? { warehouses: [], divisions: [], items: [] };
 
-  const selectTab = (next: Tab) => setSearchParams(next === 'ledger' ? { tab: 'ledger' } : {});
+  const selectTab = (next: Tab) => setSearchParams(next === 'balances' ? {} : { tab: next });
   const onTabKey = (event: KeyboardEvent) => {
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
-      const next = tab === 'balances' ? 'ledger' : 'balances';
+      const step = event.key === 'ArrowRight' ? 1 : TABS.length - 1;
+      const next = TABS[(TABS.indexOf(tab) + step) % TABS.length]!;
       selectTab(next);
       document.getElementById(`tab-${next}`)?.focus();
     }
@@ -68,16 +88,25 @@ export function StockPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Stock &amp; ledger</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Stock is held by purchase-order lot. Warehouse stock comes from warehouse-route receipts;
-          division stock comes from direct deliveries and is dispatched from the division itself.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Stock &amp; ledger</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Stock is held by lot. Warehouse stock comes from warehouse-route receipts and from
+            opening stock (goods already in the warehouse); division stock comes from direct
+            deliveries and is dispatched from the division itself.
+          </p>
+        </div>
+        {canWrite && (
+          <Link to="/stock/opening/new" className={`${primaryButton} shrink-0`}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add opening stock
+          </Link>
+        )}
       </div>
 
       <div role="tablist" aria-label="Stock views" className="flex gap-1 border-b border-slate-200">
-        {(['balances', 'ledger'] as const).map((t) => (
+        {TABS.map((t) => (
           <button
             key={t}
             id={`tab-${t}`}
@@ -95,7 +124,7 @@ export function StockPage() {
                 : 'border-transparent text-slate-600 hover:text-slate-900',
             ].join(' ')}
           >
-            {t === 'balances' ? 'Balances' : 'Ledger'}
+            {TAB_LABELS[t]}
           </button>
         ))}
       </div>
@@ -103,7 +132,13 @@ export function StockPage() {
       {masters.error && <ErrorPanel message={masters.error} onRetry={masters.reload} />}
 
       <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
-        {tab === 'balances' ? <BalancesTab lists={lists} /> : <LedgerTab lists={lists} />}
+        {tab === 'balances' ? (
+          <BalancesTab lists={lists} />
+        ) : tab === 'opening' ? (
+          <OpeningTab lists={lists} />
+        ) : (
+          <LedgerTab lists={lists} />
+        )}
       </div>
     </div>
   );
@@ -194,7 +229,7 @@ function LocationCell({ location }: { location: StockLocation }) {
 function LotCell({ lot }: { lot: PoLotRef }) {
   return (
     <>
-      <Link to={`/purchase-orders/${lot.purchaseOrderId}`} className={linkClass}>
+      <Link to={lotHref(lot)} className={linkClass}>
         {lot.poNumber}
       </Link>
       <div className="text-xs text-slate-500">
@@ -252,7 +287,8 @@ function BalancesTab({ lists }: { lists: Masters }) {
         <ErrorPanel message={balances.error} onRetry={balances.reload} />
       ) : balances.data && balances.data.items.length === 0 ? (
         <EmptyState title="No stock matches these filters">
-          Stock appears here once goods are received against a purchase order.
+          Stock appears here once goods are received against a purchase order or added as opening
+          stock.
         </EmptyState>
       ) : balances.data ? (
         <>
@@ -305,6 +341,131 @@ function BalancesTab({ lists }: { lists: Masters }) {
             pageSize={PAGE_SIZE}
             total={balances.data.total}
             noun="lots"
+            onPage={setPage}
+          />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function OpeningTab({ lists }: { lists: Masters }) {
+  const [warehouseId, setWarehouseId] = useState('');
+  const [includeCancelled, setIncludeCancelled] = useState(false);
+  const [page, setPage] = useState(1);
+  const params = {
+    warehouseId: warehouseId || undefined,
+    status: includeCancelled ? ('all' as const) : ('open' as const),
+    page,
+    pageSize: PAGE_SIZE,
+  };
+  const entries = useResource(
+    `opening:${JSON.stringify(params)}`,
+    (signal) => listOpeningStock(params, signal),
+    'Opening stock could not be loaded.',
+  );
+
+  return (
+    <div className="space-y-4 pt-4">
+      <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-xs sm:grid-cols-2 lg:grid-cols-4">
+        <label className="block text-xs font-medium text-slate-600">
+          Warehouse
+          <select
+            value={warehouseId}
+            onChange={(e) => {
+              setWarehouseId(e.target.value);
+              setPage(1);
+            }}
+            className={`${inputClass()} mt-1`}
+          >
+            <option value="">All warehouses</option>
+            {lists.warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+                {!w.active ? ' (inactive)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={includeCancelled}
+            onChange={(e) => {
+              setIncludeCancelled(e.target.checked);
+              setPage(1);
+            }}
+            className="h-4 w-4 rounded border-slate-300 text-emerald-700"
+          />
+          Show cancelled
+        </label>
+      </div>
+
+      {entries.loading ? (
+        <LoadingRows label="Loading opening stock" rows={4} />
+      ) : entries.error ? (
+        <ErrorPanel message={entries.error} onRetry={entries.reload} />
+      ) : entries.data && entries.data.items.length === 0 ? (
+        <EmptyState title="No opening stock yet">
+          Use “Add opening stock” to enter goods that are already in a warehouse.
+        </EmptyState>
+      ) : entries.data ? (
+        <>
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-xs">
+            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+              <caption className="sr-only">Opening stock entries</caption>
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th scope="col" className="px-4 py-3">
+                    Entry
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Date
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Warehouse
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Reference
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-right">
+                    Units
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {entries.data.items.map((e) => (
+                  <tr key={e.id}>
+                    <td className="px-4 py-3">
+                      <Link to={`/stock/opening/${e.id}`} className={linkClass}>
+                        {e.code}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">{formatDateOnly(e.entryDate)}</td>
+                    <td className="px-4 py-3">{e.warehouse.name}</td>
+                    <td className="px-4 py-3 text-slate-600">{e.reference ?? '—'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {e.totalQuantity.toLocaleString()}
+                      <div className="text-xs text-slate-500">
+                        {e.lineCount} {e.lineCount === 1 ? 'item' : 'items'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <RecordStatusBadge status={e.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={entries.data.total}
+            noun="entries"
             onPage={setPage}
           />
         </>
@@ -445,7 +606,9 @@ function LedgerTab({ lists }: { lists: Masters }) {
                         to={
                           m.source.kind === 'RECEIPT'
                             ? `/receiving/${m.source.id}`
-                            : `/dispatches/${m.source.id}`
+                            : m.source.kind === 'OPENING'
+                              ? `/stock/opening/${m.source.id}`
+                              : `/dispatches/${m.source.id}`
                         }
                         className={`${linkClass} text-xs`}
                       >

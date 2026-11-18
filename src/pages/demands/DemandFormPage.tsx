@@ -24,6 +24,9 @@ interface LineState {
   id?: string;
   itemId: string;
   destinationDivisionId: string;
+  /** Chosen city (optional). `cityText` is what is typed in the city box. */
+  cityId: string;
+  cityText: string;
   quantity: string;
   receiverName: string;
   receiverPhone: string;
@@ -34,6 +37,24 @@ interface Options {
   provinces: MasterRecord[];
   divisions: MasterRecord[];
   items: MasterRecord[];
+  cities: MasterRecord[];
+  receivers: MasterRecord[];
+}
+
+/** Text shown for a city in the city box: "City — District, Division". */
+export function cityLabel(city: Pick<MasterRecord, 'name' | 'districtName' | 'divisionName'>) {
+  const parts = [city.districtName, city.divisionName].filter(Boolean);
+  return parts.length > 0 ? `${city.name} — ${parts.join(', ')}` : city.name;
+}
+
+/** Finds the city for typed text: an exact label, or a city name that is unique. */
+function findCity(cities: MasterRecord[], text: string): MasterRecord | undefined {
+  const typed = text.trim().toLowerCase();
+  if (!typed) return undefined;
+  const byLabel = cities.find((c) => cityLabel(c).toLowerCase() === typed);
+  if (byLabel) return byLabel;
+  const byName = cities.filter((c) => c.name.toLowerCase() === typed);
+  return byName.length === 1 ? byName[0] : undefined;
 }
 
 type LoadState =
@@ -47,6 +68,8 @@ const emptyLine = (): LineState => ({
   key: newKey(),
   itemId: '',
   destinationDivisionId: '',
+  cityId: '',
+  cityText: '',
   quantity: '',
   receiverName: '',
   receiverPhone: '',
@@ -83,12 +106,14 @@ export function DemandFormPage() {
       listAllMasterRecords('provinces', 'active', signal),
       listAllMasterRecords('divisions', 'active', signal),
       listAllMasterRecords('items', 'active', signal),
+      listAllMasterRecords('cities', 'active', signal),
+      listAllMasterRecords('receivers', 'active', signal),
       id ? getDemand(id, signal) : Promise.resolve(null),
     ])
-      .then(([departments, provinces, divisions, items, demand]) =>
+      .then(([departments, provinces, divisions, items, cities, receivers, demand]) =>
         setState({
           kind: 'ready',
-          options: { departments, provinces, divisions, items },
+          options: { departments, provinces, divisions, items, cities, receivers },
           demand,
         }),
       )
@@ -175,6 +200,14 @@ function DemandForm({
           id: l.id,
           itemId: l.item.id,
           destinationDivisionId: l.destinationDivision.id,
+          cityId: l.city?.id ?? '',
+          cityText: l.city
+            ? cityLabel({
+                name: l.city.name,
+                districtName: l.city.districtName ?? undefined,
+                divisionName: l.destinationDivision.name,
+              })
+            : '',
           quantity: String(l.quantity),
           receiverName: l.receiverName ?? '',
           receiverPhone: l.receiverPhone ?? '',
@@ -207,6 +240,30 @@ function DemandForm({
   const updateLine = (key: string, patch: Partial<LineState>) =>
     setLines((current) => current.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
+  // Receivers per city (first active one is used to fill a line).
+  const receiversByCity = useMemo(() => {
+    const map = new Map<string, MasterRecord>();
+    for (const r of options.receivers) if (r.cityId && !map.has(r.cityId)) map.set(r.cityId, r);
+    return map;
+  }, [options.receivers]);
+
+  /** Typing or choosing a city fills the destination division and the city's receiver. */
+  const chooseCity = (line: LineState, text: string) => {
+    const city = findCity(options.cities, text);
+    if (!city) {
+      updateLine(line.key, { cityText: text, cityId: '' });
+      return;
+    }
+    const receiver = receiversByCity.get(city.id);
+    updateLine(line.key, {
+      cityText: cityLabel(city),
+      cityId: city.id,
+      ...(city.divisionId ? { destinationDivisionId: city.divisionId } : {}),
+      ...(receiver ? { receiverName: receiver.name, receiverPhone: receiver.phone ?? '' } : {}),
+    });
+  };
+  const cityById = useMemo(() => new Map(options.cities.map((c) => [c.id, c])), [options.cities]);
+
   const validate = (): Record<string, string> => {
     const next: Record<string, string> = {};
     if (!demandDate) next.demandDate = 'Enter the demand date.';
@@ -219,6 +276,9 @@ function DemandForm({
       if (!line.itemId) next[`lines.${i}.itemId`] = 'Choose an item.';
       if (!line.destinationDivisionId) {
         next[`lines.${i}.destinationDivisionId`] = 'Choose a destination.';
+      }
+      if (line.cityText.trim() && !line.cityId) {
+        next[`lines.${i}.cityId`] = 'Choose a city from the list, or leave it empty.';
       }
       const qty = Number(line.quantity);
       if (!line.quantity.trim() || !Number.isInteger(qty) || qty < 1) {
@@ -258,6 +318,7 @@ function DemandForm({
         ...(l.id ? { id: l.id } : {}),
         itemId: l.itemId,
         destinationDivisionId: l.destinationDivisionId,
+        cityId: l.cityId || null,
         quantity: Number(l.quantity),
         receiverName: l.receiverName.trim() || null,
         receiverPhone: l.receiverPhone.trim() || null,
@@ -411,6 +472,15 @@ function DemandForm({
           </button>
         </div>
         {errors.lines && <p className="text-sm text-red-700">{errors.lines}</p>}
+        <p className="text-sm text-slate-500">
+          Type or choose a city: its division and the division&apos;s receiver are filled in
+          automatically. You can still change them.
+        </p>
+        <datalist id="demand-city-options">
+          {options.cities.map((c) => (
+            <option key={c.id} value={cityLabel(c)} />
+          ))}
+        </datalist>
         <ol className="space-y-3">
           {lines.map((line, index) => {
             const err = (field: string) => errors[`lines.${index}.${field}`];
@@ -436,7 +506,7 @@ function DemandForm({
                 {errors[`lines.${index}`] && (
                   <p className="mb-3 text-sm text-red-700">{errors[`lines.${index}`]}</p>
                 )}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <FormField id={`item-${line.key}`} label="Item" error={err('itemId')}>
                     <select
                       id={`item-${line.key}`}
@@ -453,6 +523,18 @@ function DemandForm({
                       ))}
                     </select>
                   </FormField>
+                  <FormField id={`city-${line.key}`} label="City (optional)" error={err('cityId')}>
+                    <input
+                      id={`city-${line.key}`}
+                      list="demand-city-options"
+                      value={line.cityText}
+                      autoComplete="off"
+                      placeholder="Type a city name"
+                      onChange={(e) => chooseCity(line, e.target.value)}
+                      aria-invalid={Boolean(err('cityId'))}
+                      className={inputClass(Boolean(err('cityId')))}
+                    />
+                  </FormField>
                   <FormField
                     id={`dest-${line.key}`}
                     label="Destination division"
@@ -461,9 +543,15 @@ function DemandForm({
                     <select
                       id={`dest-${line.key}`}
                       value={line.destinationDivisionId}
-                      onChange={(e) =>
-                        updateLine(line.key, { destinationDivisionId: e.target.value })
-                      }
+                      onChange={(e) => {
+                        const divisionId = e.target.value;
+                        // A city outside the new division no longer applies.
+                        const keepCity = cityById.get(line.cityId)?.divisionId === divisionId;
+                        updateLine(line.key, {
+                          destinationDivisionId: divisionId,
+                          ...(keepCity ? {} : { cityId: '', cityText: '' }),
+                        });
+                      }}
                       aria-invalid={Boolean(err('destinationDivisionId'))}
                       className={inputClass(Boolean(err('destinationDivisionId')))}
                     >

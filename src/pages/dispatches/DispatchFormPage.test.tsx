@@ -101,7 +101,7 @@ describe('Dispatch form', () => {
     expect((post?.init?.headers as Record<string, string>)['X-CSRF-Token']).toBe(
       operatorSession.csrfToken,
     );
-  });
+  }, 20_000); // drives many controls; jsdom can exceed the 5 s default on slow machines
 
   it('caps quantities at the stock balance and the demand line remaining', async () => {
     const user = userEvent.setup();

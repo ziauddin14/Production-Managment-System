@@ -27,6 +27,8 @@ import {
   dispatchListResponseSchema,
   paymentListResponseSchema,
   paymentSchema,
+  openingStockDetailSchema,
+  openingStockListResponseSchema,
   receiptDetailSchema,
   receiptListResponseSchema,
   reportResponseSchema,
@@ -44,6 +46,10 @@ import {
   type PaymentListParams,
   type PaymentListResponse,
   type PaymentPayload,
+  type OpeningStockDetail,
+  type OpeningStockListParams,
+  type OpeningStockListResponse,
+  type OpeningStockPayload,
   type ReceiptDetail,
   type ReceiptListParams,
   type ReceiptListResponse,
@@ -207,7 +213,9 @@ export interface MasterWriteFields {
   provinceId?: string;
   divisionId?: string;
   districtId?: string;
+  cityId?: string;
   contactPerson?: string;
+  phone?: string;
 }
 
 export function createMasterRecord(
@@ -379,6 +387,44 @@ export function cancelReceipt(
   csrfToken: string,
 ): Promise<ReceiptDetail> {
   return apiRequest(`/api/receipts/${id}/cancel`, receiptDetailSchema, {
+    method: 'POST',
+    body,
+    csrfToken,
+  });
+}
+
+// ---- Opening stock ----
+
+export function listOpeningStock(
+  params: OpeningStockListParams,
+  signal?: AbortSignal,
+): Promise<OpeningStockListResponse> {
+  return apiRequest(`/api/stock/opening${toQueryString(params)}`, openingStockListResponseSchema, {
+    signal,
+  });
+}
+
+export function getOpeningStock(id: string, signal?: AbortSignal): Promise<OpeningStockDetail> {
+  return apiRequest(`/api/stock/opening/${id}`, openingStockDetailSchema, { signal });
+}
+
+export function createOpeningStock(
+  body: OpeningStockPayload,
+  csrfToken: string,
+): Promise<OpeningStockDetail> {
+  return apiRequest('/api/stock/opening', openingStockDetailSchema, {
+    method: 'POST',
+    body,
+    csrfToken,
+  });
+}
+
+export function cancelOpeningStock(
+  id: string,
+  body: { rev: number; reason: string },
+  csrfToken: string,
+): Promise<OpeningStockDetail> {
+  return apiRequest(`/api/stock/opening/${id}/cancel`, openingStockDetailSchema, {
     method: 'POST',
     body,
     csrfToken,

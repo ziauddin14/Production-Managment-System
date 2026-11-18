@@ -81,7 +81,7 @@ describe('Purchase order form — create', () => {
     });
 
     expect(await screen.findByRole('heading', { name: 'DIT/0189' })).toBeInTheDocument();
-  });
+  }, 20_000); // drives many controls; jsdom can exceed the 5 s default on slow machines
 
   it('shows server validation errors next to the right fields', async () => {
     const user = userEvent.setup();

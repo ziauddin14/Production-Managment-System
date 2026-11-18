@@ -99,7 +99,11 @@ export function PaymentDetailPage() {
                 {formatDateTime(p.createdAt)}
                 {p.createdBy && ` by ${p.createdBy}`}
               </Field>
-              {p.notes && <Field label="Notes">{p.notes}</Field>}
+              {p.notes && (
+                <Field label="Notes">
+                  <span className="whitespace-pre-wrap">{p.notes}</span>
+                </Field>
+              )}
             </dl>
             <div className="mt-4">
               <h3 className="text-sm font-medium text-slate-500">Supporting documents</h3>

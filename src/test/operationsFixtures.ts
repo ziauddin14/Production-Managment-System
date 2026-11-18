@@ -76,6 +76,7 @@ export function receiptDetail(overrides: Partial<ReceiptDetail> = {}): ReceiptDe
   return {
     ...receiptSummary(1, { id: RECEIPT_ID }),
     notes: 'Synthetic receipt note',
+    documents: [],
     lines: [
       {
         id: '2'.repeat(24),

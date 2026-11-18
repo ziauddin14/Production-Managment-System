@@ -35,6 +35,8 @@ export const demandLineSchema = z.object({
   lineNo: z.number().int(),
   item: masterRefSchema,
   destinationDivision: masterRefSchema.extend({ provinceName: z.string().nullable() }),
+  /** Destination city (with its district), when recorded. Older lines have none. */
+  city: masterRefSchema.extend({ districtName: z.string().nullable() }).nullable().optional(),
   quantity: z.number().int(),
   quantityDelivered: z.number().int(),
   quantityRemaining: z.number().int(),
@@ -80,6 +82,7 @@ export interface DemandLinePayload {
   id?: string;
   itemId: string;
   destinationDivisionId: string;
+  cityId?: string | null;
   quantity: number;
   receiverName?: string | null;
   receiverPhone?: string | null;

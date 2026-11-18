@@ -62,6 +62,8 @@ export const purchaseOrderSummarySchema = z.object({
   approvedAmount: z.number(),
   totalAmount: z.number(),
   lineCount: z.number().int(),
+  /** Distinct item names of the lines, in line order. */
+  itemNames: z.array(z.string()),
   totalQuantity: z.number().int(),
   /** Units received from the vendor so far (M7, active receipts only). */
   totalReceived: z.number().int(),
@@ -78,6 +80,8 @@ export type PurchaseOrderSummary = z.infer<typeof purchaseOrderSummarySchema>;
 
 export const purchaseOrderDetailSchema = purchaseOrderSummarySchema.extend({
   notes: z.string().nullable(),
+  /** Photos / scans (invoice, PO copy). */
+  documents: z.array(z.object({ label: z.string(), url: z.string() })).default([]),
   invoice: invoiceMetaSchema.nullable(),
   paymentSchedule: z.array(paymentScheduleEntrySchema),
   lines: z.array(purchaseOrderLineSchema),
@@ -147,6 +151,7 @@ export interface PurchaseOrderPayload {
   notes?: string | null;
   invoice?: InvoicePayload | null;
   paymentSchedule?: PaymentScheduleEntryPayload[];
+  documents?: Array<{ label: string; url: string }>;
   lines: PurchaseOrderLinePayload[];
 }
 

@@ -46,13 +46,20 @@ describe('Purchase orders list', () => {
 
     list.resolve(
       poListResponse([
-        poSummary(1, { totalQuantity: 600, approvedAmount: 50000 }),
+        poSummary(1, {
+          totalQuantity: 600,
+          approvedAmount: 50000,
+          itemNames: ['Synthetic Box Small', 'Synthetic Box Large'],
+        }),
         poSummary(2, { status: 'CANCELLED' }),
       ]),
     );
 
     expect(await screen.findByRole('link', { name: 'DIT/0001' })).toBeInTheDocument();
     const table = screen.getByRole('table');
+    expect(within(table).getByRole('columnheader', { name: 'Items' })).toBeInTheDocument();
+    expect(within(table).getByText('Synthetic Box Small')).toBeInTheDocument();
+    expect(within(table).getByText('Synthetic Box Large')).toBeInTheDocument();
     expect(within(table).getByText('Open')).toBeInTheDocument();
     expect(within(table).getByText('Cancelled')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'New purchase order' })).toHaveAttribute(

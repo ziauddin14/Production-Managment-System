@@ -351,7 +351,13 @@ function PaymentForm({ po, csrfToken }: { po: PurchaseOrderDetail; csrfToken: st
               />
               <FieldError id="payment-notes-error" message={errors.notes} />
             </div>
-            <DocumentsEditor rows={documents} onChange={setDocuments} errors={errors} />
+            <DocumentsEditor
+              rows={documents}
+              onChange={setDocuments}
+              errors={errors}
+              uploadPurpose="payment"
+              hint="e.g. payment receipt photo"
+            />
           </section>
 
           <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">

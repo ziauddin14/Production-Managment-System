@@ -65,6 +65,7 @@ export function poSummary(
     approvedAmount: 50000,
     totalAmount: 50000,
     lineCount: 1,
+    itemNames: ['Synthetic Donation Box'],
     totalQuantity: 500,
     totalReceived: 0,
     paidAmount: 0,
@@ -82,6 +83,7 @@ export function poDetail(overrides: Partial<PurchaseOrderDetail> = {}): Purchase
   return {
     ...poSummary(1, { id: PO_ID }),
     notes: 'Synthetic PO notes',
+    documents: [],
     invoice: {
       invoiceNo: 'INV-001',
       invoiceDate: '2026-01-15',

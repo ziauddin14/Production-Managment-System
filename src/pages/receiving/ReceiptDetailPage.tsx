@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router';
 import { Ban } from 'lucide-react';
 import { cancelReceipt, getReceipt } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
+import { DocumentList } from '../../components/Documents';
 import {
   BackLink,
   CancelReasonDialog,
@@ -103,8 +104,18 @@ export function ReceiptDetailPage() {
                 {formatDateTime(r.createdAt)}
                 {r.createdBy && ` by ${r.createdBy}`}
               </Field>
-              {r.notes && <Field label="Notes">{r.notes}</Field>}
+              {r.notes && (
+                <Field label="Notes">
+                  <span className="whitespace-pre-wrap">{r.notes}</span>
+                </Field>
+              )}
             </dl>
+            <div className="mt-4">
+              <h3 className="text-sm font-medium text-slate-700">Supporting documents</h3>
+              <div className="mt-2">
+                <DocumentList documents={r.documents} />
+              </div>
+            </div>
             {r.deliveryRoute === 'DIRECT' && (
               <p className="mt-4 text-xs text-slate-500">
                 Direct deliveries are recorded at the division and are not warehouse stock.

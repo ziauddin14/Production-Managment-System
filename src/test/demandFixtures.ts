@@ -27,6 +27,19 @@ export const syntheticDivisionB = master('b2', 'DIV-000002', 'Synthetic Division
 });
 export const syntheticItem = master('c1', 'ITM-000001', 'Synthetic Item One');
 export const syntheticItemTwo = master('c2', 'ITM-000002', 'Synthetic Item Two');
+export const syntheticCity = master('f1', 'CTY-000001', 'Synthetic Town', {
+  districtId: 'f2'.padStart(24, '0'),
+  districtName: 'Synthetic District',
+  divisionId: syntheticDivisionB.id,
+  divisionName: syntheticDivisionB.name,
+  provinceId: syntheticProvinceB.id,
+  provinceName: syntheticProvinceB.name,
+});
+export const syntheticReceiver = master('f3', 'RCV-000001', 'Synthetic Receiver', {
+  cityId: syntheticCity.id,
+  cityName: syntheticCity.name,
+  phone: '0000-0000009',
+});
 
 export const ref = (r: MasterRecord): MasterRef => ({
   id: r.id,
@@ -45,6 +58,8 @@ export const masterRoutes = () => ({
   'GET /api/master/provinces': masterPage([syntheticProvinceA, syntheticProvinceB]),
   'GET /api/master/divisions': masterPage([syntheticDivisionA, syntheticDivisionB]),
   'GET /api/master/items': masterPage([syntheticItem, syntheticItemTwo]),
+  'GET /api/master/cities': masterPage([syntheticCity]),
+  'GET /api/master/receivers': masterPage([syntheticReceiver]),
 });
 
 export const DEMAND_ID = 'e'.repeat(24);

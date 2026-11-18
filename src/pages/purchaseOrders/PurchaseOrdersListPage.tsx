@@ -319,6 +319,9 @@ export function PurchaseOrdersListPage() {
                     Vendor
                   </th>
                   <th scope="col" className="px-4 py-3">
+                    Items
+                  </th>
+                  <th scope="col" className="px-4 py-3">
                     Delivery Route
                   </th>
                   <th scope="col" className="px-4 py-3 text-right">
@@ -357,6 +360,17 @@ export function PurchaseOrdersListPage() {
                       {po.vendor.name}
                       {!po.vendor.active && (
                         <span className="ml-1 text-xs text-amber-700">(inactive)</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700 min-w-40">
+                      {po.itemNames.length > 0 ? (
+                        <ul className="space-y-0.5">
+                          {po.itemNames.map((name) => (
+                            <li key={name}>{name}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        '—'
                       )}
                     </td>
                     <td className="px-4 py-3 text-slate-600">

@@ -115,6 +115,7 @@ describe('Receipt form', () => {
       receiptDate: todayInKarachi(),
       vendorChallanNo: 'SYN-CH-1',
       notes: null,
+      documents: [],
       lines: [{ poLineId: PO_LINE_ID, quantity: 200 }],
     });
     const headers = post?.init?.headers as Record<string, string>;

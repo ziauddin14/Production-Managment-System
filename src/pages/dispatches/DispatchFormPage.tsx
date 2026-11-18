@@ -645,7 +645,12 @@ function DispatchForm({
           setters={{ setBiltyNo, setTransporterName, setVehicleNo, setFreightAmount, setNotes }}
           errors={errors}
         />
-        <DocumentsEditor rows={documents} onChange={setDocuments} errors={errors} />
+        <DocumentsEditor
+          rows={documents}
+          onChange={setDocuments}
+          errors={errors}
+          uploadPurpose="dispatch"
+        />
       </section>
 
       <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">

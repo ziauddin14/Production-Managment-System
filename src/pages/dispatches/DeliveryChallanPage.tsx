@@ -159,7 +159,7 @@ export function DeliveryChallanPage() {
           </div>
 
           {d.notes && (
-            <p className="text-sm">
+            <p className="text-sm whitespace-pre-wrap">
               <span className="font-medium">Notes: </span>
               {d.notes}
             </p>

@@ -10,6 +10,7 @@ export const masterEntityKeys = [
   'items',
   'vendors',
   'warehouses',
+  'receivers',
 ] as const;
 export type MasterEntityKey = (typeof masterEntityKeys)[number];
 
@@ -28,8 +29,12 @@ export const masterRecordSchema = z.object({
   divisionName: z.string().optional(),
   districtId: z.string().optional(),
   districtName: z.string().optional(),
+  cityId: z.string().optional(),
+  cityName: z.string().optional(),
   /** Vendors only. */
   contactPerson: z.string().nullable().optional(),
+  /** Receivers only (personal data; the list is visible to the Production Operator only). */
+  phone: z.string().nullable().optional(),
 });
 export type MasterRecord = z.infer<typeof masterRecordSchema>;
 
@@ -43,7 +48,7 @@ export type MasterListResponse = z.infer<typeof masterListResponseSchema>;
 
 export type MasterStatusFilter = 'active' | 'inactive' | 'all';
 
-export type MasterParentField = 'provinceId' | 'divisionId' | 'districtId';
+export type MasterParentField = 'provinceId' | 'divisionId' | 'districtId' | 'cityId';
 
 export interface MasterListParams {
   search?: string;
@@ -53,6 +58,7 @@ export interface MasterListParams {
   provinceId?: string;
   divisionId?: string;
   districtId?: string;
+  cityId?: string;
 }
 
 /** One level of the location chain (province → division → district → city). */
@@ -64,7 +70,7 @@ export interface LocationLevel {
   parentField?: MasterParentField;
   label: string;
   /** Record field holding the name of this level. */
-  nameField: 'provinceName' | 'divisionName' | 'districtName';
+  nameField: 'provinceName' | 'divisionName' | 'districtName' | 'cityName';
 }
 
 export const LOCATION_LEVELS: LocationLevel[] = [
@@ -83,11 +89,21 @@ export const LOCATION_LEVELS: LocationLevel[] = [
     label: 'District',
     nameField: 'districtName',
   },
+  {
+    entity: 'cities',
+    field: 'cityId',
+    parentField: 'districtId',
+    label: 'City',
+    nameField: 'cityName',
+  },
 ];
+
+/** Lists with personal data: only the Production Operator may see them (Q-30). */
+export const OPERATOR_ONLY_ENTITIES: readonly MasterEntityKey[] = ['receivers'];
 
 /** The levels above a location list, top first (e.g. cities: province, division, district). */
 export function ancestorsOf(entity: MasterEntityKey): LocationLevel[] {
-  const depth = { divisions: 1, districts: 2, cities: 3 }[entity as string] ?? 0;
+  const depth = { divisions: 1, districts: 2, cities: 3, receivers: 4 }[entity as string] ?? 0;
   return LOCATION_LEVELS.slice(0, depth);
 }
 
@@ -157,5 +173,13 @@ export const MASTER_ENTITY_META: Record<MasterEntityKey, MasterEntityMeta> = {
     singular: 'warehouse',
     description: 'Locations where physical stock is held.',
     nameHeader: 'Name',
+  },
+  receivers: {
+    key: 'receivers',
+    label: 'Receivers',
+    singular: 'receiver',
+    description:
+      'Division receivers (name and phone) per city. Choosing a city on a demand line fills them in.',
+    nameHeader: 'Receiver',
   },
 };

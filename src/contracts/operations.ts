@@ -83,6 +83,7 @@ export type ReceiptSummary = z.infer<typeof receiptSummarySchema>;
 
 export const receiptDetailSchema = receiptSummarySchema.extend({
   notes: z.string().nullable(),
+  documents: z.array(documentRefSchema).default([]),
   lines: z.array(receiptLineSchema),
   cancellation: cancellationSchema,
 });
@@ -107,7 +108,72 @@ export interface ReceiptPayload {
   receiptDate: string;
   vendorChallanNo?: string | null;
   notes?: string | null;
+  documents?: DocumentRef[];
   lines: Array<{ poLineId: string; quantity: number }>;
+}
+
+// ---- Opening stock (goods already in a warehouse, no PMS purchase order) ----------------------
+
+export const openingStockSummarySchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  entryDate: z.string(),
+  status: recordStatusSchema,
+  warehouse: masterRefSchema,
+  reference: z.string().nullable(),
+  totalQuantity: z.number().int(),
+  lineCount: z.number().int(),
+  rev: z.number().int(),
+  createdAt: z.string(),
+  createdBy: z.string().nullable(),
+});
+export type OpeningStockSummary = z.infer<typeof openingStockSummarySchema>;
+
+export const openingStockDetailSchema = openingStockSummarySchema.extend({
+  notes: z.string().nullable(),
+  lines: z.array(
+    z.object({
+      id: z.string(),
+      lineNo: z.number().int(),
+      item: masterRefSchema,
+      quantity: z.number().int(),
+    }),
+  ),
+  cancellation: cancellationSchema,
+});
+export type OpeningStockDetail = z.infer<typeof openingStockDetailSchema>;
+
+export const openingStockListResponseSchema = pageOf(openingStockSummarySchema);
+export type OpeningStockListResponse = z.infer<typeof openingStockListResponseSchema>;
+
+export interface OpeningStockListParams {
+  search?: string;
+  status?: RecordStatusFilter;
+  warehouseId?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface OpeningStockPayload {
+  warehouseId: string;
+  entryDate: string;
+  reference?: string | null;
+  notes?: string | null;
+  lines: Array<{ itemId: string; quantity: number }>;
+}
+
+/** Opening-stock lots carry the entry's OPN- code instead of a PO code. */
+export function isOpeningLot(lot: { purchaseOrderCode: string }): boolean {
+  return lot.purchaseOrderCode.startsWith('OPN-');
+}
+
+/** Where a lot's source record opens: the purchase order, or the opening-stock entry. */
+export function lotHref(lot: { purchaseOrderId: string; purchaseOrderCode: string }): string {
+  return isOpeningLot(lot)
+    ? `/stock/opening/${lot.purchaseOrderId}`
+    : `/purchase-orders/${lot.purchaseOrderId}`;
 }
 
 // ---- M7 Stock balances and inventory ledger ---------------------------------------------------
@@ -141,6 +207,8 @@ export const stockMovementTypes = [
   'RECEIPT_CANCELLED',
   'DISPATCH',
   'DISPATCH_CANCELLED',
+  'OPENING',
+  'OPENING_CANCELLED',
 ] as const;
 export type StockMovementType = (typeof stockMovementTypes)[number];
 
@@ -154,7 +222,11 @@ export const stockMovementSchema = z.object({
   lot: poLotRefSchema,
   /** Positive = into the location, negative = out of it. */
   quantity: z.number().int(),
-  source: z.object({ kind: z.enum(['RECEIPT', 'DISPATCH']), id: z.string(), code: z.string() }),
+  source: z.object({
+    kind: z.enum(['RECEIPT', 'DISPATCH', 'OPENING']),
+    id: z.string(),
+    code: z.string(),
+  }),
   by: z.string().nullable(),
 });
 export type StockMovement = z.infer<typeof stockMovementSchema>;
@@ -422,6 +494,8 @@ export const MOVEMENT_TYPE_LABELS: Record<StockMovementType, string> = {
   RECEIPT_CANCELLED: 'Receipt cancelled',
   DISPATCH: 'Dispatch',
   DISPATCH_CANCELLED: 'Dispatch cancelled',
+  OPENING: 'Opening stock',
+  OPENING_CANCELLED: 'Opening stock cancelled',
 };
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {

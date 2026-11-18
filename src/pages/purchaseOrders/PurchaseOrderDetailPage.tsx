@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { ApiError, cancelPurchaseOrder, getPurchaseOrder } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
+import { DocumentList } from '../../components/Documents';
 import {
   ErrorPanel,
   formatDateOnly,
@@ -373,6 +374,12 @@ export function PurchaseOrderDetailPage() {
               No invoice has been associated with this purchase order yet.
             </div>
           )}
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-medium text-slate-700">Supporting documents</h3>
+            <div className="mt-2">
+              <DocumentList documents={po.documents} />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -440,7 +447,9 @@ export function PurchaseOrderDetailPage() {
                     {!line.item.active && (
                       <span className="ml-1 text-xs text-amber-700">(inactive)</span>
                     )}
-                    {line.notes && <div className="text-xs text-slate-500">{line.notes}</div>}
+                    {line.notes && (
+                      <div className="text-xs text-slate-500 whitespace-pre-wrap">{line.notes}</div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
                     {line.demand ? (

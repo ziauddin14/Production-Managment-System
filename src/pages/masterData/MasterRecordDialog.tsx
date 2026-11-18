@@ -26,17 +26,20 @@ interface Props {
   onApiError(error: unknown): boolean;
 }
 
-type FieldName = 'name' | 'contactPerson' | MasterParentField;
+type FieldName = 'name' | 'contactPerson' | 'phone' | MasterParentField;
 type Errors = Partial<Record<FieldName, string>>;
 
 const NAME_MAX = 100;
 const FIELD_NAMES: FieldName[] = [
   'name',
   'contactPerson',
+  'phone',
   'provinceId',
   'divisionId',
   'districtId',
+  'cityId',
 ];
+const PHONE_PATTERN = /^[0-9+()\-\s]{5,30}$/;
 
 const inputClass = (invalid: boolean) =>
   [
@@ -60,9 +63,11 @@ export function MasterRecordDialog({
   const levels = ancestorsOf(entity);
   const parentLevel = levels.at(-1);
   const hasContact = entity === 'vendors';
+  const hasPhone = entity === 'receivers';
 
   const [name, setName] = useState(record?.name ?? '');
   const [contactPerson, setContactPerson] = useState(record?.contactPerson ?? '');
+  const [phone, setPhone] = useState(record?.phone ?? '');
   const [chosen, setChosen] = useState<string[]>(() =>
     levels.map((level) => record?.[level.field] ?? ''),
   );
@@ -91,6 +96,10 @@ export function MasterRecordDialog({
     if (!trimmed) next.name = 'Enter a name.';
     else if (trimmed.length > NAME_MAX) next.name = `Use at most ${NAME_MAX} characters.`;
     if (contact.length > NAME_MAX) next.contactPerson = `Use at most ${NAME_MAX} characters.`;
+    const phoneValue = phone.trim();
+    if (phoneValue && !PHONE_PATTERN.test(phoneValue)) {
+      next.phone = 'Use digits, spaces, +, - and brackets only.';
+    }
     levels.forEach((level, i) => {
       if (!chosen[i]) next[level.field] = `Choose a ${level.label.toLowerCase()}.`;
     });
@@ -104,6 +113,9 @@ export function MasterRecordDialog({
     }
     if (hasContact && (record ? contact !== (record.contactPerson ?? '') : contact)) {
       extra.contactPerson = contact;
+    }
+    if (hasPhone && (record ? phoneValue !== (record.phone ?? '') : phoneValue)) {
+      extra.phone = phoneValue;
     }
 
     setSaving(true);
@@ -236,6 +248,30 @@ export function MasterRecordDialog({
               {errors.contactPerson && (
                 <p id="master-contact-error" className="mt-1 text-xs text-red-700">
                   {errors.contactPerson}
+                </p>
+              )}
+            </div>
+          )}
+
+          {hasPhone && (
+            <div>
+              <label htmlFor="master-phone" className="block text-sm font-medium text-slate-700">
+                Phone <span className="font-normal text-slate-500">(optional)</span>
+              </label>
+              <input
+                id="master-phone"
+                type="tel"
+                inputMode="tel"
+                value={phone}
+                maxLength={30}
+                onChange={(e) => setPhone(e.target.value)}
+                aria-invalid={Boolean(errors.phone)}
+                aria-describedby={errors.phone ? 'master-phone-error' : undefined}
+                className={inputClass(Boolean(errors.phone))}
+              />
+              {errors.phone && (
+                <p id="master-phone-error" className="mt-1 text-xs text-red-700">
+                  {errors.phone}
                 </p>
               )}
             </div>

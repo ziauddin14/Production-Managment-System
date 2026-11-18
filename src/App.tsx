@@ -47,6 +47,14 @@ const ReceiptsListPage = lazy(() =>
 const StockPage = lazy(() =>
   import('./pages/stock/StockPage').then((m) => ({ default: m.StockPage })),
 );
+const OpeningStockFormPage = lazy(() =>
+  import('./pages/stock/OpeningStockFormPage').then((m) => ({ default: m.OpeningStockFormPage })),
+);
+const OpeningStockDetailPage = lazy(() =>
+  import('./pages/stock/OpeningStockDetailPage').then((m) => ({
+    default: m.OpeningStockDetailPage,
+  })),
+);
 const DeliveryChallanPage = lazy(() =>
   import('./pages/dispatches/DeliveryChallanPage').then((m) => ({
     default: m.DeliveryChallanPage,
@@ -120,6 +128,8 @@ export function App() {
           <Route path="receiving/new" element={<ReceiptFormPage />} />
           <Route path="receiving/:id" element={<ReceiptDetailPage />} />
           <Route path="stock" element={<StockPage />} />
+          <Route path="stock/opening/new" element={<OpeningStockFormPage />} />
+          <Route path="stock/opening/:id" element={<OpeningStockDetailPage />} />
           <Route path="dispatches" element={<DispatchesListPage />} />
           <Route path="dispatches/new" element={<DispatchFormPage />} />
           <Route path="dispatches/:id" element={<DispatchDetailPage />} />

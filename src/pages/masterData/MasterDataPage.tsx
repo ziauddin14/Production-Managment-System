@@ -5,6 +5,7 @@ import { ApiError, listAllMasterRecords, listMasterRecords, updateMasterRecord }
 import { useAuth } from '../../auth/AuthContext';
 import {
   MASTER_ENTITY_META,
+  OPERATOR_ONLY_ENTITIES,
   ancestorsOf,
   masterEntityKeys,
   type MasterEntityKey,
@@ -23,8 +24,14 @@ function isEntity(value: string | undefined): value is MasterEntityKey {
 
 export function MasterDataPage() {
   const { entity } = useParams();
+  const { session } = useAuth();
+  const isOperator = session?.user.role === 'OPERATOR';
   if (entity === undefined) return <Navigate to="/master-data/provinces" replace />;
   if (!isEntity(entity)) return <NotFoundPage />;
+  const visible = masterEntityKeys.filter(
+    (key) => isOperator || !OPERATOR_ONLY_ENTITIES.includes(key),
+  );
+  const restricted = !visible.includes(entity);
   return (
     <div className="space-y-6">
       <header>
@@ -35,7 +42,7 @@ export function MasterDataPage() {
       </header>
       <nav aria-label="Master data lists" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <ul className="flex gap-1 border-b border-slate-200">
-          {masterEntityKeys.map((key) => (
+          {visible.map((key) => (
             <li key={key}>
               <NavLink
                 to={`/master-data/${key}`}
@@ -54,8 +61,17 @@ export function MasterDataPage() {
           ))}
         </ul>
       </nav>
-      {/* Keyed by entity so filters, paging and dialogs reset when switching lists. */}
-      <MasterList key={entity} entity={entity} />
+      {restricted ? (
+        <div
+          className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          role="note"
+        >
+          This list contains personal data and is visible to the Production Operator only.
+        </div>
+      ) : (
+        /* Keyed by entity so filters, paging and dialogs reset when switching lists. */
+        <MasterList key={entity} entity={entity} />
+      )}
     </div>
   );
 }
@@ -76,6 +92,7 @@ function MasterList({ entity }: { entity: MasterEntityKey }) {
   const parentLevel = ancestors.at(-1);
   const grandParentLevel = ancestors.at(-2);
   const showContact = entity === 'vendors';
+  const showPhone = entity === 'receivers';
 
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
@@ -379,6 +396,11 @@ function MasterList({ entity }: { entity: MasterEntityKey }) {
                       Contact person
                     </th>
                   )}
+                  {showPhone && (
+                    <th scope="col" className="px-4 py-3">
+                      Phone
+                    </th>
+                  )}
                   <th scope="col" className="px-4 py-3">
                     Status
                   </th>
@@ -403,6 +425,11 @@ function MasterList({ entity }: { entity: MasterEntityKey }) {
                     <td className="px-4 py-3 font-medium text-slate-900">{record.name}</td>
                     {showContact && (
                       <td className="px-4 py-3 text-slate-700">{record.contactPerson || '—'}</td>
+                    )}
+                    {showPhone && (
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                        {record.phone || '—'}
+                      </td>
                     )}
                     <td className="px-4 py-3">
                       <span

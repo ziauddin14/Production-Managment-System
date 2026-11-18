@@ -3,6 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { Info, Loader2 } from 'lucide-react';
 import { ApiError, createReceipt, getPurchaseOrder } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
+import {
+  DocumentsEditor,
+  documentsPayload,
+  validateDocuments,
+  type DocumentRow,
+} from '../../components/Documents';
 import { PurchaseOrderPicker } from '../../components/PurchaseOrderPicker';
 import {
   BackLink,
@@ -92,6 +98,7 @@ function ReceiptForm({ po, csrfToken }: { po: PurchaseOrderDetail; csrfToken: st
   const [receiptDate, setReceiptDate] = useState(today);
   const [vendorChallanNo, setVendorChallanNo] = useState('');
   const [notes, setNotes] = useState('');
+  const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -127,6 +134,7 @@ function ReceiptForm({ po, csrfToken }: { po: PurchaseOrderDetail; csrfToken: st
     }
     const lineErrors = Object.keys(next).some((k) => k.startsWith('line.'));
     if (lines.length === 0 && !lineErrors) next.lines = 'Enter a quantity for at least one line';
+    validateDocuments(documents, next);
 
     setErrors(next);
     if (Object.keys(next).length > 0) {
@@ -139,6 +147,7 @@ function ReceiptForm({ po, csrfToken }: { po: PurchaseOrderDetail; csrfToken: st
       receiptDate,
       vendorChallanNo: vendorChallanNo.trim() || null,
       notes: notes.trim() || null,
+      documents: documentsPayload(documents),
       lines,
     };
     setSaving(true);
@@ -263,6 +272,13 @@ function ReceiptForm({ po, csrfToken }: { po: PurchaseOrderDetail; csrfToken: st
           />
           <FieldError id="receipt-notes-error" message={errors.notes} />
         </div>
+        <DocumentsEditor
+          rows={documents}
+          onChange={setDocuments}
+          errors={errors}
+          uploadPurpose="receipt"
+          hint="e.g. vendor challan photo"
+        />
       </section>
 
       <section className="space-y-3">

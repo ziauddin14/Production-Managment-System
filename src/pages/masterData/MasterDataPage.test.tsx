@@ -442,6 +442,38 @@ describe('Master data — read-only users', () => {
     expect(calls.every((c) => c.method === 'GET')).toBe(true);
   });
 
+  it('shows receivers with their city chain and phone to the operator', async () => {
+    mockApi({
+      ...session(),
+      'GET /api/master/receivers': page([
+        record('Synthetic Receiver', {
+          cityName: 'Synthetic Town',
+          districtName: 'Synthetic District',
+          divisionName: 'Synthetic Division',
+          provinceName: 'Synthetic Province',
+          phone: '0000-0000009',
+        }),
+      ]),
+      'GET /api/master/cities': page([]),
+    });
+    renderApp('/master-data/receivers');
+    expect(await screen.findByRole('cell', { name: 'Synthetic Receiver' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Phone' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: '0000-0000009' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'Synthetic Town' })).toBeInTheDocument();
+  });
+
+  it('hides the receivers list (personal data) from read-only users', async () => {
+    const { calls } = mockApi({
+      ...session(viewerSession),
+      'GET /api/master/items': page([record('Synthetic Box')]),
+    });
+    renderApp('/master-data/receivers');
+    expect(await screen.findByText(/visible to the Production Operator only/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Receivers' })).not.toBeInTheDocument();
+    expect(calls.some((c) => c.path === '/api/master/receivers')).toBe(false);
+  });
+
   it('returns to sign-in when the session expires', async () => {
     mockApi({
       ...session(),

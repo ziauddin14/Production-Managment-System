@@ -21,8 +21,10 @@ import {
   syntheticDivisionA,
   syntheticDivisionB,
   syntheticItem,
+  syntheticCity,
   syntheticItemTwo,
   syntheticProvinceA,
+  syntheticReceiver,
 } from '../../test/demandFixtures';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -173,6 +175,7 @@ describe('Demand form — create', () => {
           {
             itemId: syntheticItem.id,
             destinationDivisionId: syntheticDivisionB.id,
+            cityId: null,
             quantity: 12,
             receiverName: 'Synthetic Receiver',
             receiverPhone: null,
@@ -180,11 +183,54 @@ describe('Demand form — create', () => {
           {
             itemId: syntheticItemTwo.id,
             destinationDivisionId: syntheticDivisionB.id,
+            cityId: null,
             quantity: 3,
             receiverName: null,
             receiverPhone: null,
           },
         ],
+      });
+    },
+    LONG,
+  );
+
+  it(
+    'fills the division and receiver from the chosen city',
+    async () => {
+      const user = userEvent.setup();
+      const created = demandDetail();
+      const { calls } = mockApi({
+        ...session(),
+        ...masterRoutes(),
+        'POST /api/demands': json(201, created),
+        [`GET /api/demands/${DEMAND_ID}`]: json(200, created),
+      });
+      renderApp('/demands/new');
+      await fillHeader(user);
+      const row = line(1);
+      await user.selectOptions(within(row).getByLabelText('Item'), syntheticItem.id);
+      await user.type(within(row).getByLabelText('City (optional)'), 'synthetic town');
+      expect(within(row).getByLabelText('City (optional)')).toHaveValue(
+        'Synthetic Town — Synthetic District, Synthetic Division B1',
+      );
+      expect(within(row).getByLabelText('Destination division')).toHaveValue(syntheticDivisionB.id);
+      expect(within(row).getByLabelText('Receiver name (optional)')).toHaveValue(
+        syntheticReceiver.name,
+      );
+      expect(within(row).getByLabelText('Receiver phone (optional)')).toHaveValue(
+        syntheticReceiver.phone,
+      );
+      await user.type(within(row).getByLabelText('Quantity'), '4');
+      await user.click(screen.getByRole('button', { name: 'Register demand' }));
+      expect(await screen.findByText('Registered demand DMD-000001.')).toBeInTheDocument();
+      const post = calls.find((c) => c.method === 'POST');
+      expect(JSON.parse(String(post?.init?.body)).lines[0]).toEqual({
+        itemId: syntheticItem.id,
+        destinationDivisionId: syntheticDivisionB.id,
+        cityId: syntheticCity.id,
+        quantity: 4,
+        receiverName: syntheticReceiver.name,
+        receiverPhone: syntheticReceiver.phone,
       });
     },
     LONG,
@@ -291,6 +337,7 @@ describe('Demand form — edit', () => {
           id: existing.lines[0]?.id,
           itemId: syntheticItem.id,
           destinationDivisionId: syntheticDivisionB.id,
+          cityId: null,
           quantity: 25,
           receiverName: 'Synthetic Receiver',
           receiverPhone: '0300 0000000',

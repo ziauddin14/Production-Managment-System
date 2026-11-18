@@ -36,7 +36,8 @@ export const ACTIVE_MODULES: NavItem[] = [
     label: 'Master data',
     path: '/master-data',
     icon: Database,
-    description: 'Provinces, divisions, departments, items, vendors and warehouses.',
+    description:
+      'Locations (province to city), receivers, departments, items, vendors and warehouses.',
   },
   {
     key: 'demands',

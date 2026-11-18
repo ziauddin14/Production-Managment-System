@@ -214,6 +214,17 @@ export function DemandDetailPage() {
                           <RefName value={line.item} />
                         </td>
                         <td className="px-4 py-3 text-slate-700">
+                          {line.city && (
+                            <p className="font-medium text-slate-900">
+                              {line.city.name}
+                              {line.city.districtName && (
+                                <span className="font-normal text-slate-500">
+                                  {' '}
+                                  ({line.city.districtName})
+                                </span>
+                              )}
+                            </p>
+                          )}
                           <RefName value={line.destinationDivision} />
                           {line.destinationDivision.provinceName && (
                             <p className="text-xs text-slate-500">
